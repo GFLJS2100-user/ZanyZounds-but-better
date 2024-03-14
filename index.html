@@ -2,7 +2,7 @@
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <title>ZanyZounds</title>
   <style>
-  .big-input {
+  input {
     width: 500px;
     height: 100px;
     padding: 20px;
@@ -13,45 +13,12 @@
   }
     body {
       background-color: #171717;
+      color: #FFFF;
     }
 </style>
 <script>
-// Get the input element
-const input = document.getElementById('myInput');
-
-// Add an event listener to the input element
-input.addEventListener('keypress', function(event) {
-  // Check if the user pressed the enter key
-  if (event.keyCode === 13) {
-    // Get the value of the input element
-    const value = input.value;
-
-    // Split the value into an array of notes
-    const notes = value.split(',');
-
-    // Create a new AudioContext object
-    const audioCtx = new AudioContext();
-
-    // Create a new oscillator node
-    const oscillator = audioCtx.createOscillator();
-
-    // Set the frequency of the oscillator to the first note in the array
-    oscillator.frequency.setValueAtTime(notes[0], audioCtx.currentTime);
-
-    // Connect the oscillator to the destination (speakers)
-    oscillator.connect(audioCtx.destination);
-
-    // Start the oscillator
-    oscillator.start();
-
-    // Stop the oscillator after one second
-    setTimeout(() => {
-      oscillator.stop();
-    }, 1000);
-  }
-});
+  // Don't know what to put in here, so I'm just using this as a placeholder.
 </script>
 
-<div class="big-input">
-  <input type="text" id="name" name="name" placeholder="Enter the code you want in here!" onkeypress="handleKeyPress(event)">
-</div>
+
+  <input type="text" id="name" name="code" placeholder="Enter the code you want in here!">
