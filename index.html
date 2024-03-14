@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <title>ZanyZounds</title>
+  <style>
+  .big-input {
+    width: 500px;
+    height: 100px;
+    padding: 20px;
+    border-radius: 20px;
+    background-color: #f2f2f2;
+    font-size: 18px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+  }
+    body {
+      background-color: #171717;
+    }
+</style>
+<script>
+// Get the input element
+const input = document.getElementById('myInput');
+
+// Add an event listener to the input element
+input.addEventListener('keypress', function(event) {
+  // Check if the user pressed the enter key
+  if (event.keyCode === 13) {
+    // Get the value of the input element
+    const value = input.value;
+
+    // Split the value into an array of notes
+    const notes = value.split(',');
+
+    // Create a new AudioContext object
+    const audioCtx = new AudioContext();
+
+    // Create a new oscillator node
+    const oscillator = audioCtx.createOscillator();
+
+    // Set the frequency of the oscillator to the first note in the array
+    oscillator.frequency.setValueAtTime(notes[0], audioCtx.currentTime);
+
+    // Connect the oscillator to the destination (speakers)
+    oscillator.connect(audioCtx.destination);
+
+    // Start the oscillator
+    oscillator.start();
+
+    // Stop the oscillator after one second
+    setTimeout(() => {
+      oscillator.stop();
+    }, 1000);
+  }
+});
+</script>
+
+<div class="big-input">
+  <input type="text" id="name" name="name" placeholder="Enter the code you want in here!" onkeypress="handleKeyPress(event)">
+</div>
