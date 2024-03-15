@@ -67,8 +67,8 @@ display: flex;
 flex-direction: row;
 align-items: center;
 cursor: pointer;
-width: 300px;
- 
+width: 200px;
+margin: 10px;
 }
 
 .frame:hover {
@@ -78,21 +78,32 @@ transform : translateY(-0px);
 background: linear-gradient(90deg, #264653 0%, #f200ff 100%);
 color: #000000;
 border: solid 2px #2a9d8f;
-width: 500px;
+width: 200px;
 }
+
+        #scrolling-frame {
+        width: 200px;
+        height: 300px;
+        overflow: auto;
+        border: 1px solid #ccc;
+    }
 
 </style>
 
 
-
-
-
+<script>
+    // JavaScript to make the frame scrollable
+    const frame = document.getElementById('scrolling-frame');
+    function scrollFrame(direction) {
+        frame.scrollBy(0, direction);
+    }
+</script>
 
 
   <input type="text" id="name" name="code" placeholder="Enter the code you want in here!"> 
 <button class="btn"><center>Listen to the code!</center></button> 
 
-<frame scrolling="yes">
+<div id="scrolling-frame">
 <button class="frame">The 42 Drums<button>
 <button class="frame">Funny Song!<button>
 <button class="frame">ZZ Melodi<button>
@@ -111,6 +122,5 @@ width: 500px;
 <button class="frame">THE VOID IS COMING<button>
 <button class="frame">ZANOPORTOA DA DARk<button>
 <button class="frame">Summoning Ghosts<button>
-</frame>
-
+</div>
 
