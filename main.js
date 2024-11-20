@@ -80,7 +80,7 @@ function updateCounter(t, sampleRate) {
 function initAudio() {
   audioContext = new (window.AudioContext || window.webkitAudioContext)();
   analyser = audioContext.createAnalyser();
-  analyser.fftSize = 2048;
+  analyser.fftSize = 1024; // Changed from 2048 to 1024
 }
 
 function playByteBeat(code, sampleRate, mode) {
@@ -111,14 +111,66 @@ function playByteBeat(code, sampleRate, mode) {
             // Direct scaling for floatbeat, just clamp between -1 and 1
             value = Math.max(-1, Math.min(1, value));
           }
+        } else if (mode === 'bitbeat') {
+          if (isNaN(value) || !isFinite(value)) {
+            value = 64;
+          } else {
+            // BitBeat mode: apply bitwise operation
+            value = value & 1 ? 192 : 64;
+            // Convert to audio range (-1 to 1)
+            value = (value - 128) / 128;
+          }
+        } else if (mode === 'logmode') {
+          if (isNaN(value) || !isFinite(value)) {
+            value = 0;
+          } else {
+            // LogMode: apply log2 and multiply by 32
+            value = Math.log2(Math.abs(value) + 1) * 32;
+            // Normalize to (-1, 1) range
+            value = Math.max(-1, Math.min(1, (value % 256 - 128) / 128));
+          }
+        } else if (mode === 'sinmode') {
+          if (isNaN(value) || !isFinite(value)) {
+            value = 0;
+          } else {
+            // SinMode: apply sine to the value
+            value = Math.sin(value);
+            // Already in -1 to 1 range since we're using Math.sin
+          }
+        } else if (mode === 'sinfmode') {
+          if (isNaN(value) || !isFinite(value)) {
+            value = 0;
+          } else {
+            // SinFMode: apply sine with PI/128 scaling
+            value = Math.sin(value * Math.PI / 128);
+            // Already in -1 to 1 range since we're using Math.sin
+          } 
+        } else if (mode === 'nolimit') {
+          // No Limit mode: like bytebeat but without the % 256 constraint
+          if (isNaN(value) || !isFinite(value)) {
+            value = 128;
+          } else {
+            value = Math.floor(value);
+            // Convert to audio range (-1 to 1) without limiting the range
+            value = (value - 128) / 128;
+          }
+        } else if (mode === 'signed') {
+          // Signed ByteBeat mode: like bytebeat but with signed range
+          if (isNaN(value) || !isFinite(value)) {
+            value = 128;
+          } else {
+            value = Math.floor(value);
+            value = ((value % 256) + 256) % 256; // First ensure positive range
+            value = (value + 128) % 256 - 128;   // Center around zero
+            value = value / 128; // Scale to -1 to 1 range
+          }
         } else {
-          // Bytebeat mode
+          // Original Bytebeat mode
           if (isNaN(value) || !isFinite(value)) {
             value = 128;
           } else {
             value = Math.floor(value);
             value = ((value % 256) + 256) % 256;
-            // Direct scaling from 0-255 to -1 to 1 range
             value = (value - 128) / 128;
           }
         }
