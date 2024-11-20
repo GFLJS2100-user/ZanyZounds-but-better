@@ -84,8 +84,6 @@ function initAudio() {
 }
 
 function playByteBeat(code, sampleRate, mode) {
-  updateCanvasTitle();
-
   if (currentNode) {
     currentNode.disconnect();
   }
@@ -110,14 +108,17 @@ function playByteBeat(code, sampleRate, mode) {
           if (isNaN(value) || !isFinite(value)) {
             value = 0;
           } else {
+            // Direct scaling for floatbeat, just clamp between -1 and 1
             value = Math.max(-1, Math.min(1, value));
           }
         } else {
+          // Bytebeat mode
           if (isNaN(value) || !isFinite(value)) {
             value = 128;
           } else {
             value = Math.floor(value);
             value = ((value % 256) + 256) % 256;
+            // Direct scaling from 0-255 to -1 to 1 range
             value = (value - 128) / 128;
           }
         }
@@ -148,7 +149,6 @@ function stopSound() {
     currentNode = null;
   }
   isPlaying = false;
-  updateCanvasTitle();
 }
 
 function drawWaveform() {
@@ -200,57 +200,6 @@ function drawWaveform() {
   }
   
   draw();
-}
-
-function initCanvas() {
-  const container = document.getElementById('waveform-container');
-  const canvas = document.getElementById('waveform');
-  const playBtn = container.querySelector('.canvas-btn.play');
-  const stopBtn = container.querySelector('.canvas-btn.stop');
-  
-  playBtn.addEventListener('click', () => {
-    if (!audioContext) {
-      initAudio();
-    }
-    
-    const code = editor.getValue();
-    const mode = document.getElementById('mode').value;
-    const sampleRate = parseInt(document.getElementById('sampleRate').value);
-    
-    if (code) {
-      playByteBeat(code, sampleRate, mode);
-    }
-  });
-
-  stopBtn.addEventListener('click', () => {
-    stopSound();
-  });
-
-  // Update visibility of buttons based on play state
-  const updateButtons = () => {
-    playBtn.style.display = isPlaying ? 'none' : 'block';
-    stopBtn.style.display = isPlaying ? 'block' : 'none';
-  };
-
-  // Call this whenever play state changes
-  const oldPlayByteBeat = window.playByteBeat;
-  window.playByteBeat = (...args) => {
-    oldPlayByteBeat(...args);
-    updateButtons();
-  };
-
-  const oldStopSound = window.stopSound;
-  window.stopSound = () => {
-    oldStopSound();
-    updateButtons();
-  };
-
-  updateButtons(); // Initial state
-}
-
-function updateCanvasTitle() {
-  const canvas = document.getElementById('waveform');
-  canvas.title = isPlaying ? 'Click to pause' : 'Click to play';
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -316,8 +265,26 @@ document.addEventListener('DOMContentLoaded', () => {
     editor.resize();
   });
 
-  // Initialize canvas click functionality
-  const canvas = document.getElementById('waveform');
-  canvas.style.cursor = 'pointer';
-  initCanvas();
+  const playButton = document.querySelector('.btn');
+  const stopButton = document.querySelector('.btn-stop');
+  const modeSelect = document.getElementById('mode');
+  const sampleRateInput = document.getElementById('sampleRate');
+
+  playButton.addEventListener('click', () => {
+    if (!audioContext) {
+      initAudio();
+    }
+    
+    const code = editor.getValue();
+    const mode = modeSelect.value;
+    const sampleRate = parseInt(sampleRateInput.value);
+    
+    if (code) {
+      playByteBeat(code, sampleRate, mode);
+    }
+  });
+
+  stopButton.addEventListener('click', () => {
+    stopSound();
+  });
 });
