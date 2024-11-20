@@ -18,7 +18,6 @@ let startTime;
 
 // Enhanced Math functions
 const mathFunctions = {
-  // Trigonometric functions
   sin: Math.sin,
   cos: Math.cos,
   tan: Math.tan,
@@ -32,8 +31,6 @@ const mathFunctions = {
   asinh: Math.asinh,
   acosh: Math.acosh,
   atanh: Math.atanh,
-  
-  // Basic math
   abs: Math.abs,
   floor: Math.floor,
   ceil: Math.ceil,
@@ -41,8 +38,6 @@ const mathFunctions = {
   trunc: Math.trunc,
   sign: Math.sign,
   int: Math.floor,
-  
-  // Powers and logarithms
   sqrt: Math.sqrt,
   cbrt: Math.cbrt,
   log: Math.log,
@@ -50,21 +45,15 @@ const mathFunctions = {
   log10: Math.log10,
   exp: Math.exp,
   pow: Math.pow,
-  
-  // Min/Max/Random
   min: Math.min,
   max: Math.max,
   random: Math.random,
-  
-  // Constants
   PI: Math.PI,
   E: Math.E,
   SQRT2: Math.SQRT2,
   SQRT1_2: Math.SQRT1_2,
   LN2: Math.LN2,
   LN10: Math.LN10,
-  
-  // Helper functions
   clamp: (num, min, max) => Math.min(Math.max(num, min), max),
   lerp: (start, end, amt) => (1-amt)*start + amt*end,
   map: (value, start1, stop1, start2, stop2) => 
@@ -126,15 +115,22 @@ function playByteBeat(code, sampleRate, mode) {
         let value = fn(...Object.values(mathFunctions), scaledT) || 0;
 
         if (mode === 'floatbeat') {
-          // For FloatBeat: Clamp between -1 and 1 and handle NaN
-          value = isNaN(value) ? 0 : Math.max(-1, Math.min(1, value));
-          // Apply soft clipping to prevent harsh distortion
-          value = Math.tanh(value);
+          if (isNaN(value) || !isFinite(value)) {
+            value = 0;
+          } else {
+            // Direct scaling for floatbeat, just clamp between -1 and 1
+            value = Math.max(-1, Math.min(1, value));
+          }
         } else {
-          // For ByteBeat: Convert to float and handle NaN
-          value = isNaN(value) ? 0 : ((value % 256) / 127.5 - 1);
-          // Apply soft clipping here too
-          value = Math.tanh(value);
+          // Bytebeat mode
+          if (isNaN(value) || !isFinite(value)) {
+            value = 128;
+          } else {
+            value = Math.floor(value);
+            value = ((value % 256) + 256) % 256;
+            // Direct scaling from 0-255 to -1 to 1 range
+            value = (value - 128) / 128;
+          }
         }
         
         output[i] = value;
@@ -144,8 +140,8 @@ function playByteBeat(code, sampleRate, mode) {
           updateCounter(Math.floor(t * timeScale), sampleRate);
         }
       } catch (err) {
-        output[i] = 0;
         console.error('Error in audio processing:', err);
+        output[i] = 0;
       }
     }
   };
