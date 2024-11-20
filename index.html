@@ -1,126 +1,432 @@
-<!DOCTYPE html>
-  <link rel="icon" type="image/x-icon" href="https://funtasmo.github.io/ZanyZounds/favicon.ico">
-  <title>ZanyZounds</title>
-  <style>
-  input {
-    width: 500px;
-    height: 100px;
-    padding: 20px;
-    border-radius: 20px;
-    background-color: #f2f2f2;
-    font-size: 18px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
-  }
+<html>
+<head>
+<base href="https://gfljs2100-user.github.io/ZanyZounds-but-better/">
+<link rel="icon" type="image/x-icon" href="https://funtasmo.github.io/ZanyZounds/favicon.ico">
+<title>ZanyZounds</title>
+<style>
+body {
+  background-color: #171717;
+  color: #FFFF;
+  font-family: Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+}
 
-    body {
-      background-color: #171717;
-      color: #FFFF;
-    }
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+  width: min(800px, 95vw);
+}
 
+#editor {
+  width: min(800px, 95vw);
+  height: min(300px, 50vh);
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
 
+select, input[type="number"] {
+  width: min(200px, 45vw);
+  padding: 10px;
+  border-radius: 10px;
+  background-color: #f2f2f2;
+  font-size: 16px;
+}
+
+.input-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 
 .btn {
-
-font-family: Arial;
-font-weight: 0;
-font-size: 20px;
-color: #fff;
-background: linear-gradient(90deg, #2a9d8f 0%, #61decd 100%);
-padding: 20px 30px;
-border: solid #76e084 2px;
-box-shadow: none;
-border-radius: 20px 2px 25px 0px;
-transition : 1384ms;
-transform: translateY(0);
-display: flex;
-flex-direction: row;
-align-items: center;
-cursor: pointer;
-width: 530px;
- 
+  font-family: Arial;
+  font-weight: 0;
+  font-size: clamp(16px, 4vw, 20px);
+  color: #fff;
+  background: linear-gradient(90deg, #2a9d8f 0%, #61decd 100%);
+  padding: clamp(10px, 3vw, 20px) clamp(15px, 4vw, 30px);
+  border: solid #76e084 2px;
+  box-shadow: none;
+  border-radius: 20px 2px 25px 0px;
+  transition: 1384ms;
+  transform: translateY(0);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  cursor: pointer;
+  margin-right: 10px;
 }
 
 .btn:hover {
-
-transition : 1384ms;
-transform : translateY(-0px);
-background: linear-gradient(90deg, #2a9d8f 0%, #61decd 100%);
-color: #000000;
-border: solid 2px #2a9d8f;
-width: 500px;
+  transition: 1384ms;
+  transform: translateY(-0px);
+  background: linear-gradient(90deg, #2a9d8f 0%, #61decd 100%);
+  color: #000000;
+  border: solid 2px #2a9d8f;
 }
 
-
-.frame {
-
-font-family: Arial;
-font-weight: 0;
-font-size: 20px;
-color: #fff;
-background: #264653
-padding: 20px 30px;
-border: solid #76e084 2px;
-box-shadow: none;
-transition : 1384ms;
-transform: translateY(0);
-display: flex;
-flex-direction: row;
-align-items: center;
-cursor: pointer;
-width: 200px;
-margin: 10px;
+.btn-stop {
+  background: linear-gradient(90deg, #e74c3c 0%, #c0392b 100%);
+  border: solid #e74c3c 2px;
 }
 
-.frame:hover {
-
-transition : 1384ms;
-transform : translateY(-0px);
-background: linear-gradient(90deg, #264653 0%, #f200ff 100%);
-color: #000000;
-border: solid 2px #2a9d8f;
-width: 200px;
+.btn-stop:hover {
+  background: linear-gradient(90deg, #e74c3c 0%, #c0392b 100%);
+  color: #ffffff;
+  border: solid 2px #c0392b;
 }
 
-        #scrolling-frame {
-        width: 200px;
-        height: 300px;
-        overflow: auto;
-        border: 1px solid #ccc;
-    }
+.button-container {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+}
 
+#waveform {
+  width: min(800px, 95vw);
+  height: min(200px, 30vh);
+  background-color: #333;
+}
+
+#counter {
+  font-size: 18px;
+  margin-bottom: 10px;
+  font-family: monospace;
+}
+
+@media (max-width: 600px) {
+  .button-container {
+    justify-content: center;
+  }
+  
+  .btn {
+    margin-right: 0;
+  }
+}
 </style>
 
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.23.0/ace.js"></script>
 <script>
-    // JavaScript to make the frame scrollable
-    const frame = document.getElementById('scrolling-frame');
-    function scrollFrame(direction) {
-        frame.scrollBy(0, direction);
+let audioContext;
+let analyser;
+let isPlaying = false;
+let currentNode = null;
+let oscillator = null;
+let editor;
+let startTime;
+
+// Enhanced Math functions
+const mathFunctions = {
+  // Trigonometric functions
+  sin: Math.sin,
+  cos: Math.cos,
+  tan: Math.tan,
+  asin: Math.asin,
+  acos: Math.acos,
+  atan: Math.atan,
+  atan2: Math.atan2,
+  sinh: Math.sinh,
+  cosh: Math.cosh,
+  tanh: Math.tanh,
+  asinh: Math.asinh,
+  acosh: Math.acosh,
+  atanh: Math.atanh,
+  
+  // Basic math
+  abs: Math.abs,
+  floor: Math.floor,
+  ceil: Math.ceil,
+  round: Math.round,
+  trunc: Math.trunc,
+  sign: Math.sign,
+  int: Math.floor,
+  
+  // Powers and logarithms
+  sqrt: Math.sqrt,
+  cbrt: Math.cbrt,
+  log: Math.log,
+  log2: Math.log2,
+  log10: Math.log10,
+  exp: Math.exp,
+  pow: Math.pow,
+  
+  // Min/Max/Random
+  min: Math.min,
+  max: Math.max,
+  random: Math.random,
+  
+  // Constants
+  PI: Math.PI,
+  E: Math.E,
+  SQRT2: Math.SQRT2,
+  SQRT1_2: Math.SQRT1_2,
+  LN2: Math.LN2,
+  LN10: Math.LN10,
+  
+  // Helper functions
+  clamp: (num, min, max) => Math.min(Math.max(num, min), max),
+  lerp: (start, end, amt) => (1-amt)*start + amt*end,
+  map: (value, start1, stop1, start2, stop2) => 
+    start2 + (stop2 - start2) * ((value - start1) / (stop1 - start1)),
+  smooth: (x) => x * x * (3 - 2 * x),
+  wrap: (x, min, max) => min + ((x - min) % (max - min)),
+  noise: (x) => Math.sin(x * 12.9898 + x * 78.233) * 43758.5453 % 1,
+  saw: (x) => (x % 1) * 2 - 1,
+  square: (x) => Math.sin(x) >= 0 ? 1 : -1,
+  triangle: (x) => Math.abs(((x % 1) * 4 - 2)) - 1,
+  pulse: (x, width = 0.5) => ((x % 1) < width) ? 1 : -1,
+  dist: (x, y) => Math.sqrt(x*x + y*y),
+  fract: (x) => x - Math.floor(x),
+  mix: (a, b, t) => a * (1 - t) + b * t,
+};
+
+async function loadPreset(url) {
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error loading preset:', error);
+    return null;
+  }
+}
+
+function updateCounter(t, sampleRate) {
+  const counterElement = document.getElementById('counter');
+  const seconds = t / sampleRate;
+  counterElement.textContent = `Time: ${t.toLocaleString()} samples (${seconds.toFixed(2)} seconds)`;
+}
+
+function initAudio() {
+  audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  analyser = audioContext.createAnalyser();
+  analyser.fftSize = 2048;
+}
+
+function playByteBeat(code, sampleRate, mode) {
+  if (currentNode) {
+    currentNode.disconnect();
+  }
+
+  const bufferSize = 256;
+  const node = audioContext.createScriptProcessor(bufferSize, 1, 1);
+  
+  let t = 0;
+  startTime = Date.now();
+  const timeScale = sampleRate / audioContext.sampleRate;
+  
+  node.onaudioprocess = function(e) {
+    const output = e.outputBuffer.getChannelData(0);
+    
+    for (let i = 0; i < bufferSize; i++) {
+      try {
+        const scaledT = Math.floor(t * timeScale);
+        const fn = new Function(...Object.keys(mathFunctions), 't', `return ${code};`);
+        let value = fn(...Object.values(mathFunctions), scaledT) || 0;
+
+        if (mode === 'floatbeat') {
+          // For FloatBeat: Clamp between -1 and 1 and handle NaN
+          value = isNaN(value) ? 0 : Math.max(-1, Math.min(1, value));
+          // Apply soft clipping to prevent harsh distortion
+          value = Math.tanh(value);
+        } else {
+          // For ByteBeat: Convert to float and handle NaN
+          value = isNaN(value) ? 0 : ((value % 256) / 127.5 - 1);
+          // Apply soft clipping here too
+          value = Math.tanh(value);
+        }
+        
+        output[i] = value;
+        t++;
+        
+        if (i === 0) {
+          updateCounter(Math.floor(t * timeScale), sampleRate);
+        }
+      } catch (err) {
+        output[i] = 0;
+        console.error('Error in audio processing:', err);
+      }
     }
+  };
+
+  node.connect(analyser);
+  analyser.connect(audioContext.destination);
+  currentNode = node;
+  isPlaying = true;
+  drawWaveform();
+}
+
+function stopSound() {
+  if (currentNode) {
+    currentNode.disconnect();
+    currentNode = null;
+  }
+  isPlaying = false;
+}
+
+function drawWaveform() {
+  const canvas = document.getElementById('waveform');
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+  
+  const canvasCtx = canvas.getContext('2d');
+  canvasCtx.imageSmoothingEnabled = false;
+  
+  const width = canvas.width;
+  const height = canvas.height;
+  const bufferLength = analyser.frequencyBinCount;
+  const dataArray = new Uint8Array(bufferLength);
+
+  function draw() {
+    if (!isPlaying) return;
+    
+    requestAnimationFrame(draw);
+    
+    analyser.getByteTimeDomainData(dataArray);
+    
+    canvasCtx.fillStyle = 'rgb(20, 20, 20)';
+    canvasCtx.fillRect(0, 0, width, height);
+    
+    canvasCtx.lineWidth = 1;
+    canvasCtx.strokeStyle = 'rgb(0, 255, 0)';
+    
+    canvasCtx.beginPath();
+    
+    const sliceWidth = width * 1.0 / bufferLength;
+    let x = 0;
+    
+    for (let i = 0; i < bufferLength; i++) {
+      const v = dataArray[i] / 128.0;
+      const y = height - (v * height / 2);
+      
+      if (i === 0) {
+        canvasCtx.moveTo(x, y);
+      } else {
+        canvasCtx.lineTo(x, y);
+      }
+      
+      x += sliceWidth;
+    }
+    
+    canvasCtx.lineTo(width, height/2);
+    canvasCtx.stroke();
+  }
+  
+  draw();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  editor = ace.edit("editor");
+  editor.setTheme("ace/theme/monokai");
+  editor.session.setMode("ace/mode/javascript");
+  editor.setFontSize(16);
+
+  // Add button to add Math. prefix
+  const addMathButton = document.createElement('button');
+  addMathButton.className = 'btn';
+  addMathButton.textContent = 'Add Math. prefix';
+  addMathButton.onclick = () => {
+    const text = editor.getValue();
+    const mathFunctionNames = Object.keys(Math).filter(key => typeof Math[key] === 'function');
+    let newText = text;
+    
+    for (const funcName of mathFunctionNames) {
+      const regex = new RegExp(`(?<!Math\\.)\\b${funcName}\\s*\\(`, 'g');
+      newText = newText.replace(regex, `Math.${funcName}(`);
+    }
+    
+    editor.setValue(newText, -1);
+  };
+  document.querySelector('.button-container').insertBefore(addMathButton, document.querySelector('.btn-stop'));
+
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.has('code')) {
+    const code = atob(urlParams.get('code'));
+    editor.setValue(code);
+  }
+  if (urlParams.has('mode')) {
+    document.getElementById('mode').value = urlParams.get('mode');
+  }
+  if (urlParams.has('sampleRate')) {
+    document.getElementById('sampleRate').value = urlParams.get('sampleRate');
+  }
+
+  let saveTimeout;
+  const saveState = () => {
+    const code = editor.getValue();
+    const mode = document.getElementById('mode').value;
+    const sampleRate = document.getElementById('sampleRate').value;
+    
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.set('code', btoa(code));
+    newUrl.searchParams.set('mode', mode);
+    newUrl.searchParams.set('sampleRate', sampleRate);
+    
+    window.history.replaceState({}, '', newUrl);
+  };
+
+  const debouncedSave = () => {
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(saveState, 1000);
+  };
+
+  editor.session.on('change', debouncedSave);
+  document.getElementById('mode').addEventListener('change', saveState);
+  document.getElementById('sampleRate').addEventListener('change', saveState);
+
+  window.addEventListener('resize', () => {
+    editor.resize();
+  });
+
+  const playButton = document.querySelector('.btn');
+  const stopButton = document.querySelector('.btn-stop');
+  const modeSelect = document.getElementById('mode');
+  const sampleRateInput = document.getElementById('sampleRate');
+
+  playButton.addEventListener('click', () => {
+    if (!audioContext) {
+      initAudio();
+    }
+    
+    const code = editor.getValue();
+    const mode = modeSelect.value;
+    const sampleRate = parseInt(sampleRateInput.value);
+    
+    if (code) {
+      playByteBeat(code, sampleRate, mode);
+    }
+  });
+
+  stopButton.addEventListener('click', () => {
+    stopSound();
+  });
+});
 </script>
 
-
-  <input type="text" id="name" name="code" placeholder="Enter the code you want in here!"> 
-<button class="btn"><center>Listen to the code!</center></button> 
-
-<div id="scrolling-frame">
-<button class="frame">The 42 Drums<button>
-<button class="frame">Funny Song!<button>
-<button class="frame">ZZ Melodi<button>
-<button class="frame">THE [.] BOX<button>
-<button class="frame">Weird, dreamy sound<button>
-<button class="frame">The Box but dreamier<button>
-<button class="frame">Cool 8-bit music<button>
-<button class="frame">The 24 Melody?<button>
-<button class="frame">Voice code<button>
-<button class="frame">20th Century Fox<button>
-<button class="frame">42 Melody with delay<button>
-<button class="frame">Sound base for Eggs trombone<button>
-<button class="frame">Guitar when you smashed your finger<button>
-<button class="frame">Dog Days - Bags N Buckets<button>
-<button class="frame">Santi Banti - Bags N Buckets<button>
-<button class="frame">THE VOID IS COMING<button>
-<button class="frame">ZANOPORTOA DA DARk<button>
-<button class="frame">Summoning Ghosts<button>
+<body>
+<div class="controls">
+  <div id="editor"></div>
+  <div class="input-row">
+    <select id="mode">
+      <option value="bytebeat">ByteBeat</option>
+      <option value="floatbeat">FloatBeat</option>
+    </select>
+    <input type="number" id="sampleRate" value="44100" placeholder="Sample Rate (Hz)">
+  </div>
 </div>
-
+<div id="counter">Time: 0 samples (0.00 seconds)</div>
+<div class="button-container">
+  <button class="btn">Listen to the code!</button>
+  <button class="btn btn-stop">Stop the code!</button>
+</div>
+<canvas id="waveform"></canvas>
+</body>
+</html>
