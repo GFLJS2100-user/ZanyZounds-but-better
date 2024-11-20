@@ -303,7 +303,7 @@ document.addEventListener('DOMContentLoaded', () => {
     saveTimeout = setTimeout(() => {
       saveState();
       updateSound();
-    }, 1000);
+    }, 1);
   };
 
   // Update on code changes
