@@ -260,19 +260,18 @@ document.addEventListener('DOMContentLoaded', () => {
   editor.session.setMode("ace/mode/javascript");
   editor.setFontSize(16);
 
+  // Set default code if no code in URL
+  const defaultCode = 't%(t^t>>8)^t>>8|t>>11';
+  
   // Load initial state from URL
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.has('code')) {
     const code = atob(urlParams.get('code'));
-    editor.setValue(code, -1); // Move cursor to start
+    editor.setValue(code, -1);
+  } else {
+    editor.setValue(defaultCode, -1);
   }
-  if (urlParams.has('mode')) {
-    document.getElementById('mode').value = urlParams.get('mode');
-  }
-  if (urlParams.has('sampleRate')) {
-    document.getElementById('sampleRate').value = urlParams.get('sampleRate');
-  }
-
+  
   // Add state saving functionality
   let saveTimeout;
   const saveState = () => {
@@ -329,8 +328,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const playButton = document.querySelector('.btn');
   const stopButton = document.querySelector('.btn-stop');
-  const modeSelect = document.getElementById('mode');
-  const sampleRateInput = document.getElementById('sampleRate');
 
   playButton.addEventListener('click', () => {
     if (!audioContext) {
@@ -338,8 +335,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     const code = editor.getValue();
-    const mode = modeSelect.value;
-    const sampleRate = parseInt(sampleRateInput.value);
+    const mode = document.getElementById('mode').value;
+    const sampleRate = parseInt(document.getElementById('sampleRate').value);
     
     if (code) {
       playByteBeat(code, sampleRate, mode);
