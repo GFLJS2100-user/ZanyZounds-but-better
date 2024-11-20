@@ -4,7 +4,7 @@ ZanyZounds is a code IDE based on Bytebeat code to generate waves and music! Thi
 
 # How to use it
 
-How do you use ZanyZounds? It's easy! Although to get the whole data of ZanyZounds you have to go to the wiki. For example, type "z = [6,6,3,6]" for an example melody number sequence. But then after that, you have to make the sound base and the sound type. Type something like this for the sound base. "s = [�A>2PX]" is a drum sound base for ZanyZounds. And now for the sound type! For the sound type all you gotta do is just type a sound wave. For example, "t = [NOISE]" would work if you wanted a bit noise sound type. And that's all for today!
+How do you use ZanyZounds? It's easy! Although to get the whole data of ZanyZounds you have to go to the wiki. For example, type "t^t>>8" at 8000hz for an example xor code sequence. But then after that, you have to make the beats and the kicks. Type something like this for the sound base. "(4E3/(t&4095))" is a beat sound base for ZanyZounds. And now for the kick! For the kick all you gotta do is just type a cbrt math. For example, "512*(cbrt(t%4096))" would work if you wanted a kick sound type. And that's all for today!
 
 # The Zound Library
 
