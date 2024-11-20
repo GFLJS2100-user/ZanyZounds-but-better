@@ -83,10 +83,56 @@ select, input[type="number"] {
   margin-bottom: 10px;
 }
 
-#waveform {
+#waveform-container {
+  position: relative;
   width: min(800px, 95vw);
   height: min(200px, 30vh);
-  background-color: #333;
+}
+
+#waveform {
+  width: 100%;
+  height: 100%;
+}
+
+.canvas-controls {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: none;
+  gap: 10px;
+  background: rgba(0,0,0,0.7);
+  padding: 15px;
+  border-radius: 10px;
+}
+
+#waveform-container:hover .canvas-controls {
+  display: flex;
+}
+
+.canvas-btn {
+  font-size: 16px;
+  color: #fff;
+  background: linear-gradient(90deg, #2a9d8f 0%, #61decd 100%);
+  padding: 8px 16px;
+  border: solid #76e084 2px;
+  border-radius: 15px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.canvas-btn:hover {
+  transform: scale(1.05);
+  background: linear-gradient(90deg, #61decd 0%, #2a9d8f 100%);
+}
+
+.canvas-btn.stop {
+  background: linear-gradient(90deg, #e74c3c 0%, #c0392b 100%);
+  border: solid #e74c3c 2px;
+}
+
+.canvas-btn.stop:hover {
+  background: linear-gradient(90deg, #c0392b 0%, #e74c3c 100%);
 }
 
 #counter {
