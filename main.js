@@ -260,28 +260,11 @@ document.addEventListener('DOMContentLoaded', () => {
   editor.session.setMode("ace/mode/javascript");
   editor.setFontSize(16);
 
-  // Add button to add Math. prefix
-  const addMathButton = document.createElement('button');
-  addMathButton.className = 'btn';
-  addMathButton.textContent = 'Add Math. prefix';
-  addMathButton.onclick = () => {
-    const text = editor.getValue();
-    const mathFunctionNames = Object.keys(Math).filter(key => typeof Math[key] === 'function');
-    let newText = text;
-    
-    for (const funcName of mathFunctionNames) {
-      const regex = new RegExp(`(?<!Math\\.)\\b${funcName}\\s*\\(`, 'g');
-      newText = newText.replace(regex, `Math.${funcName}(`);
-    }
-    
-    editor.setValue(newText, -1);
-  };
-  document.querySelector('.button-container').insertBefore(addMathButton, document.querySelector('.btn-stop'));
-
+  // Load initial state from URL
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.has('code')) {
     const code = atob(urlParams.get('code'));
-    editor.setValue(code);
+    editor.setValue(code, -1); // Move cursor to start
   }
   if (urlParams.has('mode')) {
     document.getElementById('mode').value = urlParams.get('mode');
@@ -290,13 +273,14 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('sampleRate').value = urlParams.get('sampleRate');
   }
 
+  // Add state saving functionality
   let saveTimeout;
   const saveState = () => {
     const code = editor.getValue();
     const mode = document.getElementById('mode').value;
     const sampleRate = document.getElementById('sampleRate').value;
     
-    const newUrl = new URL(window.location.href);
+    const newUrl = new URL(window.location.origin + window.location.pathname);  // Updated line
     newUrl.searchParams.set('code', btoa(code));
     newUrl.searchParams.set('mode', mode);
     newUrl.searchParams.set('sampleRate', sampleRate);
@@ -304,14 +288,40 @@ document.addEventListener('DOMContentLoaded', () => {
     window.history.replaceState({}, '', newUrl);
   };
 
-  const debouncedSave = () => {
-    clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(saveState, 1000);
+  // Add real-time sound update for code and mode changes
+  const updateSound = () => {
+    if (isPlaying && audioContext) {
+      const code = editor.getValue();
+      const mode = document.getElementById('mode').value;
+      const sampleRate = parseInt(document.getElementById('sampleRate').value);
+      playByteBeat(code, sampleRate, mode);
+    }
   };
 
+  const debouncedSave = () => {
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => {
+      saveState();
+      updateSound();
+    }, 1000);
+  };
+
+  // Update on code changes
   editor.session.on('change', debouncedSave);
-  document.getElementById('mode').addEventListener('change', saveState);
-  document.getElementById('sampleRate').addEventListener('change', saveState);
+  
+  // Update on mode changes
+  document.getElementById('mode').addEventListener('change', () => {
+    saveState();
+    updateSound();
+  });
+
+  // Update on sample rate changes (only when Enter is pressed)
+  document.getElementById('sampleRate').addEventListener('keyup', (e) => {
+    if (e.key === 'Enter') {
+      saveState();
+      updateSound();
+    }
+  });
 
   window.addEventListener('resize', () => {
     editor.resize();
