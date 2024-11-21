@@ -2,12 +2,12 @@
   "items": [
     {
       "name": "Sound Name",
-      "author": "Your Name",
-      "code": "t%(t^t>>8)^t>>8|t>>6",
+      "author": "GFLJS2100",
+      "code": "((t*(t>>12|8)&t>>4^t>>7^t>>4|t*(t>>12|t>>9))%256/2+64)+((8E3/(t&4095))+128)",
       "mode": "bytebeat",
-      "sampleRate": 44100,
+      "sampleRate": 8000,
       "favorite": false,
-      "created": "2023-12-25"
+      "created": "2024-11-21"
     }
   ]
 }
