@@ -168,21 +168,6 @@ function playByteBeat(code, sampleRate, mode) {
   startTime = Date.now();
   const timeScale = sampleRate / audioContext.sampleRate;
   
-    let leftCode = code;
-  let rightCode = code;
-  
-  // Updated stereo parsing logic
-  const trimmedCode = code.trim();
-  const stereoMatch = trimmedCode.match(/\[(.*),(.*)\]$/);
-  if (stereoMatch) {
-    try {
-      leftCode = stereoMatch[1].trim();
-      rightCode = stereoMatch[2].trim();
-    } catch (err) {
-      console.error('Error parsing stereo code:', err);
-    }
-  }
-  
   node.onaudioprocess = function(e) {
     const leftOutput = e.outputBuffer.getChannelData(0);
     const rightOutput = e.outputBuffer.getChannelData(1);
@@ -191,33 +176,29 @@ function playByteBeat(code, sampleRate, mode) {
       try {
         const scaledT = Math.floor(t * timeScale);
         
-        // Handle variable assignments for left channel
-        let processedLeftCode = leftCode;
-        const leftAssignments = leftCode.match(/[a-zA-Z]+\s*=\s*\([^)]+\)/g) || [];
-        for (const assignment of leftAssignments) {
-          const [varName, expression] = assignment.split('=').map(x => x.trim());
-          const value = new Function(...Object.keys(mathFunctions), 't', 
-            `return ${expression.replace(/[()]/g, '')};`
-          )(...Object.values(mathFunctions), scaledT);
-          processedLeftCode = processedLeftCode.replace(assignment, value);
-        }
+        // Check if code contains array syntax [left,right]
+        let leftValue, rightValue;
         
-        // Handle variable assignments for right channel
-        let processedRightCode = rightCode;
-        const rightAssignments = rightCode.match(/[a-zA-Z]+\s*=\s*\([^)]+\)/g) || [];
-        for (const assignment of rightAssignments) {
-          const [varName, expression] = assignment.split('=').map(x => x.trim());
-          const value = new Function(...Object.keys(mathFunctions), 't',
-            `return ${expression.replace(/[()]/g, '')};`
-          )(...Object.values(mathFunctions), scaledT);
-          processedRightCode = processedRightCode.replace(assignment, value);
+        if (code.includes('[') && code.includes(']')) {
+          // Parse array syntax for stereo
+          const stereoCode = code.trim();
+          if (stereoCode.startsWith('[') && stereoCode.endsWith(']')) {
+            const channels = stereoCode.slice(1, -1).split(',');
+            if (channels.length === 2) {
+              const leftFn = new Function(...Object.keys(mathFunctions), 't', `return ${channels[0].trim()};`);
+              const rightFn = new Function(...Object.keys(mathFunctions), 't', `return ${channels[1].trim()};`);
+              
+              leftValue = leftFn(...Object.values(mathFunctions), scaledT) || 0;
+              rightValue = rightFn(...Object.values(mathFunctions), scaledT) || 0;
+            } else {
+              throw new Error('Stereo code must have exactly two channels');
+            }
+          }
+        } else {
+          // Mono code - same value for both channels
+          const fn = new Function(...Object.keys(mathFunctions), 't', `return ${code};`);
+          leftValue = rightValue = fn(...Object.values(mathFunctions), scaledT) || 0;
         }
-
-        const leftFn = new Function(...Object.keys(mathFunctions), 't', `return ${processedLeftCode};`);
-        let leftValue = leftFn(...Object.values(mathFunctions), scaledT) || 0;
-        
-        const rightFn = new Function(...Object.keys(mathFunctions), 't', `return ${processedRightCode};`);
-        let rightValue = rightFn(...Object.values(mathFunctions), scaledT) || 0;
 
         // Process values based on mode
         if (mode === 'floatbeat') {
@@ -356,15 +337,27 @@ document.addEventListener('DOMContentLoaded', () => {
   editor.setFontSize(16);
 
   // Set default code if no code in URL
-  const defaultCode = 't%(t^t>>8)^t>>8|t>>11|t>>7';
+  const defaultCode = 't%(t^t>>8)^t>>8|t>>6';
 
   // Load initial state from URL
   const urlParams = new URLSearchParams(window.location.search);
+  
+  // Load code
   if (urlParams.has('code')) {
     const code = atob(urlParams.get('code'));
     editor.setValue(code, -1);
   } else {
     editor.setValue(defaultCode, -1);
+  }
+
+  // Load mode
+  if (urlParams.has('mode')) {
+    document.getElementById('mode').value = urlParams.get('mode');
+  }
+
+  // Load sample rate
+  if (urlParams.has('sampleRate')) {
+    document.getElementById('sampleRate').value = urlParams.get('sampleRate');
   }
 
   // Add state saving functionality
@@ -458,4 +451,3 @@ document.addEventListener('DOMContentLoaded', () => {
   // Load library on startup
   loadLibrary();
 });
-
