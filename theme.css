@@ -75,6 +75,17 @@ select, input[type="number"] {
   border: solid 2px #c0392b;
 }
 
+.btn-favorites {
+  background: linear-gradient(90deg, #f1c40f 0%, #f39c12 100%);
+  border: solid #f1c40f 2px;
+}
+
+.btn-favorites:hover {
+  background: linear-gradient(90deg, #f1c40f 0%, #f39c12 100%);
+  border: solid #f39c12 2px;
+  color: #000000;
+}
+
 .button-container {
   display: flex;
   align-items: center;
