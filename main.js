@@ -64,15 +64,81 @@ let library = {
   items: []
 };
 
-function openLibrary() {
-  document.getElementById('libraryModal').style.display = 'block';
+// Cookie handling functions
+function setCookie(name, value, days) {
+  const d = new Date();
+  d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
+  const expires = "expires=" + d.toUTCString();
+  document.cookie = name + "=" + value + ";" + expires + ";path=/";
+}
+
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  if (match) return JSON.parse(decodeURIComponent(match[2]));
+  return [];
+}
+
+// Favorites handling
+let favorites = getCookie('zanyZoundsFavorites') || [];
+
+function saveFavorites() {
+  setCookie('zanyZoundsFavorites', JSON.stringify(favorites), 365); // Save for 1 year
+}
+
+function toggleFavorite(index) {
+  const item = library.items[index];
+  const favIndex = favorites.findIndex(f => f.name === item.name);
+  
+  if (favIndex === -1) {
+    favorites.push(item);
+    item.favorite = true;
+  } else {
+    favorites.splice(favIndex, 1);
+    item.favorite = false;
+  }
+  
+  saveFavorites();
   renderLibrary();
+  renderFavorites();
 }
 
-function closeLibrary() {
-  document.getElementById('libraryModal').style.display = 'none';
+function openFavorites() {
+  document.getElementById('favoritesModal').style.display = 'block';
+  renderFavorites();
 }
 
+function closeFavorites() {
+  document.getElementById('favoritesModal').style.display = 'none';
+}
+
+function renderFavorites() {
+  const container = document.getElementById('favoritesItems');
+  container.innerHTML = '';
+  
+  favorites.forEach((item) => {
+    const div = document.createElement('div');
+    div.className = 'library-item';
+    div.innerHTML = `
+      <h3>${item.name}</h3>
+      <div class="library-item-info">
+        Author: ${item.author}<br>
+        Mode: ${item.mode}<br>
+        Sample Rate: ${item.sampleRate}Hz
+      </div>
+      <div class="library-item-actions">
+        <button class="btn" onclick="loadPreset(${JSON.stringify(item)})">Load</button>
+        <span class="favorite-btn active" onclick="toggleFavorite(${library.items.findIndex(i => i.name === item.name)})">⭐</span>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+  
+  if (favorites.length === 0) {
+    container.innerHTML = '<p>No favorites yet! Add some from the library.</p>';
+  }
+}
+
+// Modified loadLibrary function to restore favorites
 function loadLibrary() {
   fetch('./zoundlibrary/library.json')
     .then(response => {
@@ -81,17 +147,27 @@ function loadLibrary() {
     })
     .then(data => {
       library = data;
+      // Restore favorite status from cookies
+      favorites = getCookie('zanyZoundsFavorites') || [];
+      library.items.forEach(item => {
+        item.favorite = favorites.some(f => f.name === item.name);
+      });
       renderLibrary();
     })
     .catch(err => {
       console.error('Error loading library:', err);
-      library = { items: [] }; // Default empty library if load fails
+      library = { items: [] };
     });
+
 }
 
-function toggleFavorite(index) {
-  library.items[index].favorite = !library.items[index].favorite;
+function openLibrary() {
+  document.getElementById('libraryModal').style.display = 'block';
   renderLibrary();
+}
+
+function closeLibrary() {
+  document.getElementById('libraryModal').style.display = 'none';
 }
 
 function loadPreset(item) {
@@ -447,6 +523,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.querySelector('.btn-library').addEventListener('click', openLibrary);
   document.querySelector('.close').addEventListener('click', closeLibrary);
+  document.querySelector('.btn-favorites').addEventListener('click', openFavorites);
+  document.querySelector('.close-favorites').addEventListener('click', closeFavorites);
 
   // Load library on startup
   loadLibrary();
