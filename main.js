@@ -66,15 +66,10 @@ let library = {
 
 // Cookie handling functions
 function setCookie(name, value, days) {
-  try {
-    const d = new Date();
-    d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
-    const expires = "expires=" + d.toUTCString();
-    document.cookie = name + "=" + encodeURIComponent(value) + ";" + expires + ";path=/";
-  } catch (err) {
-    console.error('Error setting cookie:', err);
-    showError('Failed to save favorites to cookie');
-  }
+  const d = new Date();
+  d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
+  const expires = "expires=" + d.toUTCString();
+  document.cookie = name + "=" + value + ";" + expires + ";path=/";
 }
 
 function getCookie(name) {
@@ -87,20 +82,7 @@ function getCookie(name) {
 let favorites = getCookie('zanyZoundsFavorites') || [];
 
 function saveFavorites() {
-  try {
-    const safeData = favorites.map(item => ({
-      name: String(item.name || ''),
-      author: String(item.author || ''),
-      mode: String(item.mode || ''),
-      sampleRate: Number(item.sampleRate) || 44100,
-      code: String(item.code || ''),
-      favorite: Boolean(item.favorite)
-    }));
-    setCookie('zanyZoundsFavorites', JSON.stringify(safeData), 365);
-  } catch (err) {
-    console.error('Error saving favorites:', err);
-    showError('Failed to save favorites');
-  }
+  setCookie('zanyZoundsFavorites', JSON.stringify(favorites), 365); // Save for 1 year
 }
 
 function toggleFavorite(index) {
@@ -108,7 +90,16 @@ function toggleFavorite(index) {
   const favIndex = favorites.findIndex(f => f.name === item.name);
   
   if (favIndex === -1) {
-    favorites.push(item);
+    // Create a clean copy of the item to store in favorites
+    const favoriteItem = {
+      name: item.name,
+      author: item.author,
+      code: item.code,
+      mode: item.mode,
+      sampleRate: item.sampleRate,
+      favorite: true
+    };
+    favorites.push(favoriteItem);
     item.favorite = true;
   } else {
     favorites.splice(favIndex, 1);
@@ -136,46 +127,24 @@ function renderFavorites() {
   favorites.forEach((item) => {
     const div = document.createElement('div');
     div.className = 'library-item';
-    
-    // Create load button using a safer approach
-    const loadButton = document.createElement('button');
-    loadButton.className = 'btn';
-    loadButton.textContent = 'Load';
-    loadButton.onclick = () => loadPreset(item);
-
     div.innerHTML = `
-      <h3>${escapeHtml(item.name)}</h3>
+      <h3>${item.name}</h3>
       <div class="library-item-info">
-        Author: ${escapeHtml(item.author)}<br>
-        Mode: ${escapeHtml(item.mode)}<br>
-        Sample Rate: ${escapeHtml(String(item.sampleRate))}Hz
+        Author: ${item.author}<br>
+        Mode: ${item.mode}<br>
+        Sample Rate: ${item.sampleRate}Hz
       </div>
       <div class="library-item-actions">
+        <button class="btn" onclick='loadPreset(${JSON.stringify(item)})'>Load</button>
         <span class="favorite-btn active" onclick="toggleFavorite(${library.items.findIndex(i => i.name === item.name)})">⭐</span>
       </div>
     `;
-    
-    // Insert the load button safely
-    const actionsDiv = div.querySelector('.library-item-actions');
-    actionsDiv.insertBefore(loadButton, actionsDiv.firstChild);
-    
     container.appendChild(div);
   });
   
   if (favorites.length === 0) {
     container.innerHTML = '<p>No favorites yet! Add some from the library.</p>';
   }
-}
-
-// Add helper function to escape HTML
-function escapeHtml(unsafe) {
-  if (typeof unsafe !== 'string') return '';
-  return unsafe
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
 }
 
 function loadLibrary() {
@@ -197,6 +166,7 @@ function loadLibrary() {
       console.error('Error loading library:', err);
       library = { items: [] };
     });
+
 }
 
 function openLibrary() {
@@ -209,34 +179,45 @@ function closeLibrary() {
 }
 
 function loadPreset(item) {
-  try {
-    // Ensure we're working with an object
-    const preset = (typeof item === 'string') ? JSON.parse(item) : item;
-    
-    // Safely set the code value
-    if (typeof preset.code === 'string') {
-      editor.setValue(preset.code, -1);
+  // Ensure we're working with an object, not a string representation
+  let preset;
+  if (typeof item === 'string') {
+    try {
+      preset = JSON.parse(item);
+    } catch (e) {
+      console.error('Error parsing preset:', e);
+      return;
     }
-    
-    // Safely set mode and sample rate
-    if (typeof preset.mode === 'string') {
-      document.getElementById('mode').value = preset.mode;
-    }
-    
-    if (typeof preset.sampleRate === 'number' || typeof preset.sampleRate === 'string') {
-      document.getElementById('sampleRate').value = preset.sampleRate;
-    }
+  } else {
+    preset = item;
+  }
+  
+  // Validate the preset has required properties
+  if (!preset || !preset.code) {
+    console.error('Invalid preset:', preset);
+    return;
+  }
+  
+  // Set the editor value
+  editor.setValue(preset.code || '', -1);
+  
+  // Set mode and sample rate if they exist
+  if (preset.mode) {
+    document.getElementById('mode').value = preset.mode;
+  }
+  
+  if (preset.sampleRate) {
+    document.getElementById('sampleRate').value = preset.sampleRate;
+  }
 
-    // Close modals
-    closeFavorites();
-    closeLibrary();
+  // Close modals
+  closeFavorites();
+  closeLibrary();
 
-    // Update URL and sound if playing
-    saveState();
+  // Update URL and sound if playing
+  saveState();
+  if (isPlaying) {
     updateSound();
-  } catch (err) {
-    console.error('Error loading preset:', err);
-    showError('Failed to load preset: ' + err.message);
   }
 }
 
@@ -254,11 +235,11 @@ function renderLibrary() {
     const div = document.createElement('div');
     div.className = 'library-item';
     div.innerHTML = `
-      <h3>${escapeHtml(item.name)}</h3>
+      <h3>${item.name}</h3>
       <div class="library-item-info">
-        Author: ${escapeHtml(item.author)}<br>
-        Mode: ${escapeHtml(item.mode)}<br>
-        Sample Rate: ${escapeHtml(String(item.sampleRate))}Hz
+        Author: ${item.author}<br>
+        Mode: ${item.mode}<br>
+        Sample Rate: ${item.sampleRate}Hz
       </div>
       <div class="library-item-actions">
         <button class="btn" onclick="loadPreset(library.items[${index}])">Load</button>
