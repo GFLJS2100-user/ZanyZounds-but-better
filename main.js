@@ -60,15 +60,78 @@ const mathFunctions = {
   mix: (a, b, t) => a * (1 - t) + b * t,
 };
 
-async function loadPreset(url) {
-  try {
-    const response = await fetch(url);
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error loading preset:', error);
-    return null;
-  }
+let library = {
+  items: []
+};
+
+function openLibrary() {
+  document.getElementById('libraryModal').style.display = 'block';
+  renderLibrary();
+}
+
+function closeLibrary() {
+  document.getElementById('libraryModal').style.display = 'none';
+}
+
+function loadLibrary() {
+  fetch('./zoundlibrary/library.json')
+    .then(response => {
+      if (!response.ok) throw new Error('Failed to load library');
+      return response.json();
+    })
+    .then(data => {
+      library = data;
+      renderLibrary();
+    })
+    .catch(err => {
+      console.error('Error loading library:', err);
+      library = { items: [] }; // Default empty library if load fails
+    });
+}
+
+function toggleFavorite(index) {
+  library.items[index].favorite = !library.items[index].favorite;
+  renderLibrary();
+}
+
+function loadPreset(item) {
+  editor.setValue(item.code, -1);
+  document.getElementById('mode').value = item.mode;
+  document.getElementById('sampleRate').value = item.sampleRate;
+
+  // Update URL and sound if playing
+  saveState();
+  updateSound();
+}
+
+function renderLibrary() {
+  const container = document.getElementById('libraryItems');
+  container.innerHTML = '';
+
+  const sortedItems = [...library.items].sort((a, b) => {
+    if (a.favorite && !b.favorite) return -1;
+    if (!a.favorite && b.favorite) return 1;
+    return new Date(b.created) - new Date(a.created);
+  });
+
+  sortedItems.forEach((item, index) => {
+    const div = document.createElement('div');
+    div.className = 'library-item';
+    div.innerHTML = `
+      <h3>${item.name}</h3>
+      <div class="library-item-info">
+        Author: ${item.author}<br>
+        Mode: ${item.mode}<br>
+        Sample Rate: ${item.sampleRate}Hz
+      </div>
+      <div class="library-item-actions">
+        <button class="btn" onclick="loadPreset(library.items[${index}])">Load</button>
+        <span class="favorite-btn ${item.favorite ? 'active' : ''}" 
+              onclick="toggleFavorite(${index})">⭐</span>
+      </div>
+    `;
+    container.appendChild(div);
+  });
 }
 
 function updateCounter(t, sampleRate) {
@@ -207,10 +270,10 @@ function drawWaveform() {
   const canvas = document.getElementById('waveform');
   canvas.width = canvas.offsetWidth;
   canvas.height = canvas.offsetHeight;
-  
+
   const canvasCtx = canvas.getContext('2d');
   canvasCtx.imageSmoothingEnabled = false;
-  
+
   const width = canvas.width;
   const height = canvas.height;
   const bufferLength = analyser.frequencyBinCount;
@@ -218,39 +281,39 @@ function drawWaveform() {
 
   function draw() {
     if (!isPlaying) return;
-    
+
     requestAnimationFrame(draw);
-    
+
     analyser.getByteTimeDomainData(dataArray);
-    
+
     canvasCtx.fillStyle = 'rgb(20, 20, 20)';
     canvasCtx.fillRect(0, 0, width, height);
-    
+
     canvasCtx.lineWidth = 1;
     canvasCtx.strokeStyle = 'rgb(0, 255, 0)';
-    
+
     canvasCtx.beginPath();
-    
+
     const sliceWidth = width * 1.0 / bufferLength;
     let x = 0;
-    
+
     for (let i = 0; i < bufferLength; i++) {
       const v = dataArray[i] / 128.0;
       const y = height - (v * height / 2);
-      
+
       if (i === 0) {
         canvasCtx.moveTo(x, y);
       } else {
         canvasCtx.lineTo(x, y);
       }
-      
+
       x += sliceWidth;
     }
-    
+
     canvasCtx.lineTo(width, height/2);
     canvasCtx.stroke();
   }
-  
+
   draw();
 }
 
@@ -262,7 +325,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Set default code if no code in URL
   const defaultCode = 't%(t^t>>8)^t>>8|t>>11|t>>7';
-  
+
   // Load initial state from URL
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.has('code')) {
@@ -271,19 +334,19 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     editor.setValue(defaultCode, -1);
   }
-  
+
   // Add state saving functionality
   let saveTimeout;
   const saveState = () => {
     const code = editor.getValue();
     const mode = document.getElementById('mode').value;
     const sampleRate = document.getElementById('sampleRate').value;
-    
-    const newUrl = new URL(window.location.origin + window.location.pathname);  // Updated line
+
+    const newUrl = new URL(window.location.origin + window.location.pathname);
     newUrl.searchParams.set('code', btoa(code));
     newUrl.searchParams.set('mode', mode);
     newUrl.searchParams.set('sampleRate', sampleRate);
-    
+
     window.history.replaceState({}, '', newUrl);
   };
 
@@ -307,7 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Update on code changes
   editor.session.on('change', debouncedSave);
-  
+
   // Update on mode changes
   document.getElementById('mode').addEventListener('change', () => {
     saveState();
@@ -333,11 +396,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!audioContext) {
       initAudio();
     }
-    
+
     const code = editor.getValue();
     const mode = document.getElementById('mode').value;
     const sampleRate = parseInt(document.getElementById('sampleRate').value);
-    
+
     if (code) {
       playByteBeat(code, sampleRate, mode);
     }
@@ -346,4 +409,11 @@ document.addEventListener('DOMContentLoaded', () => {
   stopButton.addEventListener('click', () => {
     stopSound();
   });
+
+  document.querySelector('.btn-library').addEventListener('click', openLibrary);
+  document.querySelector('.close').addEventListener('click', closeLibrary);
+
+  // Load library on startup
+  loadLibrary();
 });
+
