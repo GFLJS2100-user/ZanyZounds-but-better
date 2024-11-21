@@ -334,6 +334,11 @@ function playByteBeat(code, sampleRate, mode) {
         } else if (mode === 'sinmode') {
           leftValue = Math.sin(leftValue);
           rightValue = Math.sin(rightValue);
+        } else if (mode === 'log10mode') {
+          leftValue = Math.log10(Math.abs(leftValue) + 1) * 32;
+          rightValue = Math.log10(Math.abs(rightValue) + 1) * 32;
+          leftValue = Math.max(-1, Math.min(1, (leftValue % 256 - 128) / 128));
+          rightValue = Math.max(-1, Math.min(1, (rightValue % 256 - 128) / 128));
         } else if (mode === 'sinfmode') {
           leftValue = Math.sin(leftValue * Math.PI / 128);
           rightValue = Math.sin(rightValue * Math.PI / 128);
