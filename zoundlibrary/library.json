@@ -1,1 +1,13 @@
-
+{
+  "items": [
+    {
+      "name": "Sound Name",
+      "author": "Your Name",
+      "code": "t%(t^t>>8)^t>>8|t>>6",
+      "mode": "bytebeat",
+      "sampleRate": 44100,
+      "favorite": false,
+      "created": "2023-12-25"
+    }
+  ]
+}
