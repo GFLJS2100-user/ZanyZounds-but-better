@@ -126,7 +126,7 @@ function renderFavorites() {
         Sample Rate: ${item.sampleRate}Hz
       </div>
       <div class="library-item-actions">
-        <button class="btn" onclick="loadPreset(${JSON.stringify(item)})">Load</button>
+        <button class="btn" onclick="loadPreset(${JSON.stringify(item).replace(/"/g, '&quot;')})">Load</button>
         <span class="favorite-btn active" onclick="toggleFavorite(${library.items.findIndex(i => i.name === item.name)})">⭐</span>
       </div>
     `;
@@ -171,9 +171,16 @@ function closeLibrary() {
 }
 
 function loadPreset(item) {
-  editor.setValue(item.code, -1);
-  document.getElementById('mode').value = item.mode;
-  document.getElementById('sampleRate').value = item.sampleRate;
+  // Convert string to object if needed
+  const preset = typeof item === 'string' ? JSON.parse(item) : item;
+  
+  editor.setValue(preset.code, -1);
+  document.getElementById('mode').value = preset.mode;
+  document.getElementById('sampleRate').value = preset.sampleRate;
+
+  // Close modals
+  closeFavorites();
+  closeLibrary();
 
   // Update URL and sound if playing
   saveState();
@@ -399,7 +406,7 @@ function drawWaveform() {
       x += sliceWidth;
     }
 
-    canvasCtx.lineTo(width, height/2);
+    canvasCtx.lineTo(width, height / 2);
     canvasCtx.stroke();
   }
 
