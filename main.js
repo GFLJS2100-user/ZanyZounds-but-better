@@ -146,99 +146,104 @@ function initAudio() {
   analyser.fftSize = 1024; // Changed from 2048 to 1024
 }
 
+function showError(message) {
+  const errorDiv = document.getElementById('errorMessage');
+  errorDiv.textContent = `Error: ${message}`;
+  errorDiv.style.display = 'block';
+  setTimeout(() => {
+    errorDiv.style.display = 'none';
+  }, 5000); // Hide after 5 seconds
+}
+
 function playByteBeat(code, sampleRate, mode) {
   if (currentNode) {
     currentNode.disconnect();
   }
 
   const bufferSize = 256;
-  const node = audioContext.createScriptProcessor(bufferSize, 1, 1);
+  // Change to stereo output (2 channels)
+  const node = audioContext.createScriptProcessor(bufferSize, 1, 2);
   
   let t = 0;
   startTime = Date.now();
   const timeScale = sampleRate / audioContext.sampleRate;
   
   node.onaudioprocess = function(e) {
-    const output = e.outputBuffer.getChannelData(0);
+    const leftOutput = e.outputBuffer.getChannelData(0);
+    const rightOutput = e.outputBuffer.getChannelData(1);
     
     for (let i = 0; i < bufferSize; i++) {
       try {
         const scaledT = Math.floor(t * timeScale);
-        const fn = new Function(...Object.keys(mathFunctions), 't', `return ${code};`);
-        let value = fn(...Object.values(mathFunctions), scaledT) || 0;
-
-        if (mode === 'floatbeat') {
-          if (isNaN(value) || !isFinite(value)) {
-            value = 0;
-          } else {
-            // Direct scaling for floatbeat, just clamp between -1 and 1
-            value = Math.max(-1, Math.min(1, value));
-          }
-        } else if (mode === 'bitbeat') {
-          if (isNaN(value) || !isFinite(value)) {
-            value = 64;
-          } else {
-            // BitBeat mode: apply bitwise operation
-            value = value & 1 ? 192 : 64;
-            // Convert to audio range (-1 to 1)
-            value = (value - 128) / 128;
-          }
-        } else if (mode === 'logmode') {
-          if (isNaN(value) || !isFinite(value)) {
-            value = 0;
-          } else {
-            // LogMode: apply log2 and multiply by 32
-            value = Math.log2(Math.abs(value) + 1) * 32;
-            // Normalize to (-1, 1) range
-            value = Math.max(-1, Math.min(1, (value % 256 - 128) / 128));
-          }
-        } else if (mode === 'sinmode') {
-          if (isNaN(value) || !isFinite(value)) {
-            value = 0;
-          } else {
-            // SinMode: apply sine to the value
-            value = Math.sin(value);
-            // Already in -1 to 1 range since we're using Math.sin
-          }
-        } else if (mode === 'sinfmode') {
-          if (isNaN(value) || !isFinite(value)) {
-            value = 0;
-          } else {
-            // SinFMode: apply sine with PI/128 scaling
-            value = Math.sin(value * Math.PI / 128);
-            // Already in -1 to 1 range since we're using Math.sin
-          } 
-        } else if (mode === 'nolimit') {
-          // No Limit mode: like bytebeat but without the % 256 constraint
-          if (isNaN(value) || !isFinite(value)) {
-            value = 128;
-          } else {
-            value = Math.floor(value);
-            // Convert to audio range (-1 to 1) without limiting the range
-            value = (value - 128) / 128;
-          }
-        } else if (mode === 'signed') {
-          // Signed ByteBeat mode: like bytebeat but with signed range
-          if (isNaN(value) || !isFinite(value)) {
-            value = 128;
-          } else {
-            value = Math.floor(value);
-            value = ((value % 256) + 256) % 256; // First ensure positive range
-            value = (value + 128) % 256 - 128;   // Center around zero
-            value = value / 128; // Scale to -1 to 1 range
+        
+        // Check if code contains array syntax [left,right]
+        let leftValue, rightValue;
+        
+        if (code.includes('[') && code.includes(']')) {
+          // Parse array syntax for stereo
+          const stereoCode = code.trim();
+          if (stereoCode.startsWith('[') && stereoCode.endsWith(']')) {
+            const channels = stereoCode.slice(1, -1).split(',');
+            if (channels.length === 2) {
+              const leftFn = new Function(...Object.keys(mathFunctions), 't', `return ${channels[0].trim()};`);
+              const rightFn = new Function(...Object.keys(mathFunctions), 't', `return ${channels[1].trim()};`);
+              
+              leftValue = leftFn(...Object.values(mathFunctions), scaledT) || 0;
+              rightValue = rightFn(...Object.values(mathFunctions), scaledT) || 0;
+            } else {
+              throw new Error('Stereo code must have exactly two channels');
+            }
           }
         } else {
+          // Mono code - same value for both channels
+          const fn = new Function(...Object.keys(mathFunctions), 't', `return ${code};`);
+          leftValue = rightValue = fn(...Object.values(mathFunctions), scaledT) || 0;
+        }
+
+        // Process values based on mode
+        if (mode === 'floatbeat') {
+          leftValue = Math.max(-1, Math.min(1, leftValue));
+          rightValue = Math.max(-1, Math.min(1, rightValue));
+        } else if (mode === 'bitbeat') {
+          leftValue = ((leftValue & 1) ? 192 : 64);
+          rightValue = ((rightValue & 1) ? 192 : 64);
+          leftValue = (leftValue - 128) / 128;
+          rightValue = (rightValue - 128) / 128;
+        } else if (mode === 'logmode') {
+          leftValue = Math.log2(Math.abs(leftValue) + 1) * 32;
+          rightValue = Math.log2(Math.abs(rightValue) + 1) * 32;
+          leftValue = Math.max(-1, Math.min(1, (leftValue % 256 - 128) / 128));
+          rightValue = Math.max(-1, Math.min(1, (rightValue % 256 - 128) / 128));
+        } else if (mode === 'sinmode') {
+          leftValue = Math.sin(leftValue);
+          rightValue = Math.sin(rightValue);
+        } else if (mode === 'sinfmode') {
+          leftValue = Math.sin(leftValue * Math.PI / 128);
+          rightValue = Math.sin(rightValue * Math.PI / 128);
+        } else if (mode === 'nolimit') {
+          leftValue = Math.floor(leftValue);
+          rightValue = Math.floor(rightValue);
+          leftValue = (leftValue - 128) / 128;
+          rightValue = (rightValue - 128) / 128;
+        } else if (mode === 'signed') {
+          leftValue = Math.floor(leftValue);
+          rightValue = Math.floor(rightValue);
+          leftValue = ((leftValue % 256) + 256) % 256;
+          rightValue = ((rightValue % 256) + 256) % 256;
+          leftValue = ((leftValue + 128) % 256 - 128) / 128;
+          rightValue = ((rightValue + 128) % 256 - 128) / 128;
+        } else {
           // Original Bytebeat mode
-          if (isNaN(value) || !isFinite(value)) {
-            value = 128;
-          } else {
-            value = Math.floor(value);
-            value = ((value % 256) + 256) % 256;
-            value = (value - 128) / 128;
-          }
+          leftValue = Math.floor(leftValue);
+          rightValue = Math.floor(rightValue);
+          leftValue = ((leftValue % 256) + 256) % 256;
+          rightValue = ((rightValue % 256) + 256) % 256;
+          leftValue = (leftValue - 128) / 128;
+          rightValue = (rightValue - 128) / 128;
         }
         
-        output[i] = value;
+        leftOutput[i] = leftValue;
+        rightOutput[i] = rightValue;
         t++;
         
         if (i === 0) {
@@ -246,7 +251,15 @@ function playByteBeat(code, sampleRate, mode) {
         }
       } catch (err) {
         console.error('Error in audio processing:', err);
-        output[i] = 0;
+        leftOutput[i] = 0;
+        rightOutput[i] = 0;
+        
+        // Only show error once when it first occurs
+        if (i === 0) {
+          showError(err.message);
+          // Optional: stop playback on error
+          // stopSound();
+        }
       }
     }
   };
@@ -393,16 +406,26 @@ document.addEventListener('DOMContentLoaded', () => {
   const stopButton = document.querySelector('.btn-stop');
 
   playButton.addEventListener('click', () => {
-    if (!audioContext) {
-      initAudio();
-    }
+    try {
+      if (!audioContext) {
+        initAudio();
+      }
 
-    const code = editor.getValue();
-    const mode = document.getElementById('mode').value;
-    const sampleRate = parseInt(document.getElementById('sampleRate').value);
+      const code = editor.getValue();
+      const mode = document.getElementById('mode').value;
+      const sampleRate = parseInt(document.getElementById('sampleRate').value);
 
-    if (code) {
+      if (!code) {
+        throw new Error('No code entered');
+      }
+      
+      if (isNaN(sampleRate) || sampleRate <= 0) {
+        throw new Error('Invalid sample rate');
+      }
+
       playByteBeat(code, sampleRate, mode);
+    } catch (err) {
+      showError(err.message);
     }
   });
 
