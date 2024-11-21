@@ -8,4 +8,4 @@ How do you use ZanyZounds? It's easy! Although to get the whole data of ZanyZoun
 
 # The Zound Library
 
-The Zound Library is a type of music selector that has code stored in each song you see in it. For example, you will see "The 42 Drums" and "THE [.] BOX". The Zound Library can also be used to find code melodies and make remixes of them. This is a cool thing for changes and more!
+The Zound Library is a type of music selector that has code stored in each song you see in it. For example, you will see "Example Bytebeat" and "Floatbeat Example". The Zound Library can also be used to find code melodies and make remixes of them. This is a cool thing for changes and more!
