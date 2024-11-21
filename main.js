@@ -2,11 +2,9 @@ let audioContext;
 let analyser;
 let isPlaying = false;
 let currentNode = null;
-let oscillator = null;
 let editor;
 let startTime;
 
-// Enhanced Math functions
 const mathFunctions = {
   sin: Math.sin,
   cos: Math.cos,
@@ -64,7 +62,6 @@ let library = {
   items: []
 };
 
-// Cookie handling functions
 function setCookie(name, value, days) {
   const d = new Date();
   d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
@@ -78,11 +75,10 @@ function getCookie(name) {
   return [];
 }
 
-// Favorites handling
 let favorites = getCookie('zanyZoundsFavorites') || [];
 
 function saveFavorites() {
-  setCookie('zanyZoundsFavorites', JSON.stringify(favorites), 365); // Save for 1 year
+  setCookie('zanyZoundsFavorites', JSON.stringify(favorites), 365);
 }
 
 function toggleFavorite(index) {
@@ -90,7 +86,6 @@ function toggleFavorite(index) {
   const favIndex = favorites.findIndex(f => f.name === item.name);
   
   if (favIndex === -1) {
-    // Create a clean copy of the item to store in favorites
     const favoriteItem = {
       name: item.name,
       author: item.author,
@@ -155,7 +150,6 @@ function loadLibrary() {
     })
     .then(data => {
       library = data;
-      // Restore favorite status from cookies
       favorites = getCookie('zanyZoundsFavorites') || [];
       library.items.forEach(item => {
         item.favorite = favorites.some(f => f.name === item.name);
@@ -166,7 +160,6 @@ function loadLibrary() {
       console.error('Error loading library:', err);
       library = { items: [] };
     });
-
 }
 
 function openLibrary() {
@@ -179,7 +172,6 @@ function closeLibrary() {
 }
 
 function loadPreset(item) {
-  // Ensure we're working with an object, not a string representation
   let preset;
   if (typeof item === 'string') {
     try {
@@ -192,16 +184,13 @@ function loadPreset(item) {
     preset = item;
   }
   
-  // Validate the preset has required properties
   if (!preset || !preset.code) {
     console.error('Invalid preset:', preset);
     return;
   }
   
-  // Set the editor value
   editor.setValue(preset.code || '', -1);
   
-  // Set mode and sample rate if they exist
   if (preset.mode) {
     document.getElementById('mode').value = preset.mode;
   }
@@ -210,11 +199,9 @@ function loadPreset(item) {
     document.getElementById('sampleRate').value = preset.sampleRate;
   }
 
-  // Close modals
   closeFavorites();
   closeLibrary();
 
-  // Update URL and sound if playing
   saveState();
   if (isPlaying) {
     updateSound();
@@ -260,31 +247,93 @@ function updateCounter(t, sampleRate) {
 function initAudio() {
   audioContext = new (window.AudioContext || window.webkitAudioContext)();
   analyser = audioContext.createAnalyser();
-  analyser.fftSize = 1024; // Changed from 2048 to 1024
+  analyser.fftSize = 2048; // Increased for better resolution
+  analyser.minDecibels = -90;
+  analyser.maxDecibels = -10;
+  analyser.smoothingTimeConstant = 0.8;
 }
 
-function showError(message) {
-  const errorDiv = document.getElementById('errorMessage');
-  errorDiv.textContent = `Error: ${message}`;
-  errorDiv.style.display = 'block';
-  setTimeout(() => {
-    errorDiv.style.display = 'none';
-  }, 5000); // Hide after 5 seconds
+function processAudioMode(value, mode, t) {
+  const rawValue = Math.floor(value);
+  
+  switch(mode) {
+    case 'bytebeat':
+      return ((rawValue % 256) + 256) % 256 / 128 - 1;
+    case 'signed':
+      return (rawValue % 256) / 128 - 1;
+    case 'nolimit':
+      return Math.tanh(value / 128);
+    case 'floatbeat':
+      return Math.tanh(value);
+    case 'bitbeat':
+      return (rawValue & 1) ? 1 : -1;
+    case 'logmode':
+      return Math.sign(value) * Math.log(Math.abs(value) + 1) / 10;
+    case 'sinmode':
+      return Math.sin(value * Math.PI / 128);
+    case 'sinfmode':
+      return Math.sin(2 * Math.PI * value / 256);
+    default:
+      return ((rawValue % 256) + 256) % 256 / 128 - 1;
+  }
 }
 
 function playByteBeat(code, sampleRate, mode) {
-  if (currentNode) {
-    currentNode.disconnect();
+  if (!audioContext) {
+    initAudio();
   }
 
-  const bufferSize = 256;
-  // Change to stereo output (2 channels)
+  stopSound(); // Ensure any previous sound is stopped
+
+  const bufferSize = 4096; // Larger buffer for smoother playback
   const node = audioContext.createScriptProcessor(bufferSize, 1, 2);
   
   let t = 0;
-  startTime = Date.now();
   const timeScale = sampleRate / audioContext.sampleRate;
   
+  let compiledFunc;
+  try {
+    if (code.trim().startsWith('[') && code.trim().endsWith(']')) {
+      const [leftCode, rightCode] = code.trim().slice(1, -1).split(',').map(c => c.trim());
+      
+      const leftFn = new Function(...Object.keys(mathFunctions), 't', 
+        `try { return ${leftCode}; } catch(e) { console.error('Left channel error:', e); return 0; }`
+      );
+      
+      const rightFn = new Function(...Object.keys(mathFunctions), 't', 
+        `try { return ${rightCode}; } catch(e) { console.error('Right channel error:', e); return 0; }`
+      );
+      
+      compiledFunc = (t) => {
+        try {
+          const leftValue = leftFn(...Object.values(mathFunctions), t);
+          const rightValue = rightFn(...Object.values(mathFunctions), t);
+          return [leftValue, rightValue];
+        } catch(e) {
+          showError(`Stereo compilation error: ${e.message}`);
+          return [0, 0];
+        }
+      };
+    } else {
+      const fn = new Function(...Object.keys(mathFunctions), 't', 
+        `try { return ${code}; } catch(e) { console.error('Mono channel error:', e); return 0; }`
+      );
+      
+      compiledFunc = (t) => {
+        try {
+          const value = fn(...Object.values(mathFunctions), t);
+          return [value, value];
+        } catch(e) {
+          showError(`Mono compilation error: ${e.message}`);
+          return [0, 0];
+        }
+      };
+    }
+  } catch(e) {
+    showError(`Compilation error: ${e.message}`);
+    return;
+  }
+
   node.onaudioprocess = function(e) {
     const leftOutput = e.outputBuffer.getChannelData(0);
     const rightOutput = e.outputBuffer.getChannelData(1);
@@ -293,89 +342,26 @@ function playByteBeat(code, sampleRate, mode) {
       try {
         const scaledT = Math.floor(t * timeScale);
         
-        // Check if code contains array syntax [left,right]
-        let leftValue, rightValue;
+        const [leftRaw, rightRaw] = compiledFunc(scaledT);
         
-        if (code.includes('[') && code.includes(']')) {
-          // Parse array syntax for stereo
-          const stereoCode = code.trim();
-          if (stereoCode.startsWith('[') && stereoCode.endsWith(']')) {
-            const channels = stereoCode.slice(1, -1).split(',');
-            if (channels.length === 2) {
-              const leftFn = new Function(...Object.keys(mathFunctions), 't', `return ${channels[0].trim()};`);
-              const rightFn = new Function(...Object.keys(mathFunctions), 't', `return ${channels[1].trim()};`);
-              
-              leftValue = leftFn(...Object.values(mathFunctions), scaledT) || 0;
-              rightValue = rightFn(...Object.values(mathFunctions), scaledT) || 0;
-            } else {
-              throw new Error('Stereo code must have exactly two channels');
-            }
-          }
-        } else {
-          // Mono code - same value for both channels
-          const fn = new Function(...Object.keys(mathFunctions), 't', `return ${code};`);
-          leftValue = rightValue = fn(...Object.values(mathFunctions), scaledT) || 0;
-        }
-
-        // Process values based on mode
-        if (mode === 'floatbeat') {
-          leftValue = Math.max(-1, Math.min(1, leftValue));
-          rightValue = Math.max(-1, Math.min(1, rightValue));
-        } else if (mode === 'bitbeat') {
-          leftValue = ((leftValue & 1) ? 192 : 64);
-          rightValue = ((rightValue & 1) ? 192 : 64);
-          leftValue = (leftValue - 128) / 128;
-          rightValue = (rightValue - 128) / 128;
-        } else if (mode === 'logmode') {
-          leftValue = Math.log2(Math.abs(leftValue) + 1) * 32;
-          rightValue = Math.log2(Math.abs(rightValue) + 1) * 32;
-          leftValue = Math.max(-1, Math.min(1, (leftValue % 256 - 128) / 128));
-          rightValue = Math.max(-1, Math.min(1, (rightValue % 256 - 128) / 128));
-        } else if (mode === 'sinmode') {
-          leftValue = Math.sin(leftValue);
-          rightValue = Math.sin(rightValue);
-        } else if (mode === 'sinfmode') {
-          leftValue = Math.sin(leftValue * Math.PI / 128);
-          rightValue = Math.sin(rightValue * Math.PI / 128);
-        } else if (mode === 'nolimit') {
-          leftValue = Math.floor(leftValue);
-          rightValue = Math.floor(rightValue);
-          leftValue = (leftValue - 128) / 128;
-          rightValue = (rightValue - 128) / 128;
-        } else if (mode === 'signed') {
-          leftValue = Math.floor(leftValue);
-          rightValue = Math.floor(rightValue);
-          leftValue = ((leftValue % 256) + 256) % 256;
-          rightValue = ((rightValue % 256) + 256) % 256;
-          leftValue = ((leftValue + 128) % 256 - 128) / 128;
-          rightValue = ((rightValue + 128) % 256 - 128) / 128;
-        } else {
-          // Original Bytebeat mode
-          leftValue = Math.floor(leftValue);
-          rightValue = Math.floor(rightValue);
-          leftValue = ((leftValue % 256) + 256) % 256;
-          rightValue = ((rightValue % 256) + 256) % 256;
-          leftValue = (leftValue - 128) / 128;
-          rightValue = (rightValue - 128) / 128;
-        }
+        const leftValue = processAudioMode(leftRaw, mode, scaledT);
+        const rightValue = processAudioMode(rightRaw, mode, scaledT);
         
-        leftOutput[i] = leftValue;
-        rightOutput[i] = rightValue;
+        leftOutput[i] = isFinite(leftValue) ? leftValue : 0;
+        rightOutput[i] = isFinite(rightValue) ? rightValue : 0;
+        
         t++;
         
         if (i === 0) {
           updateCounter(Math.floor(t * timeScale), sampleRate);
         }
       } catch (err) {
-        console.error('Error in audio processing:', err);
+        console.error('Unexpected audio processing error:', err);
         leftOutput[i] = 0;
         rightOutput[i] = 0;
         
-        // Only show error once when it first occurs
         if (i === 0) {
-          showError(err.message);
-          // Optional: stop playback on error
-          // stopSound();
+          showError(`Unexpected error: ${err.message}`);
         }
       }
     }
@@ -453,13 +439,10 @@ document.addEventListener('DOMContentLoaded', () => {
   editor.session.setMode("ace/mode/javascript");
   editor.setFontSize(16);
 
-  // Set default code if no code in URL
   const defaultCode = 't%(t^t>>8)^t>>8|t>>6';
 
-  // Load initial state from URL
   const urlParams = new URLSearchParams(window.location.search);
   
-  // Load code
   if (urlParams.has('code')) {
     const code = atob(urlParams.get('code'));
     editor.setValue(code, -1);
@@ -467,17 +450,14 @@ document.addEventListener('DOMContentLoaded', () => {
     editor.setValue(defaultCode, -1);
   }
 
-  // Load mode
   if (urlParams.has('mode')) {
     document.getElementById('mode').value = urlParams.get('mode');
   }
 
-  // Load sample rate
   if (urlParams.has('sampleRate')) {
     document.getElementById('sampleRate').value = urlParams.get('sampleRate');
   }
 
-  // Add state saving functionality
   let saveTimeout;
   const saveState = () => {
     const code = editor.getValue();
@@ -492,7 +472,6 @@ document.addEventListener('DOMContentLoaded', () => {
     window.history.replaceState({}, '', newUrl);
   };
 
-  // Add real-time sound update for code and mode changes
   const updateSound = () => {
     if (isPlaying && audioContext) {
       const code = editor.getValue();
@@ -510,16 +489,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 1);
   };
 
-  // Update on code changes
   editor.session.on('change', debouncedSave);
 
-  // Update on mode changes
   document.getElementById('mode').addEventListener('change', () => {
     saveState();
     updateSound();
   });
 
-  // Update on sample rate changes (only when Enter is pressed)
   document.getElementById('sampleRate').addEventListener('keyup', (e) => {
     if (e.key === 'Enter') {
       saveState();
@@ -567,6 +543,5 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelector('.btn-favorites').addEventListener('click', openFavorites);
   document.querySelector('.close-favorites').addEventListener('click', closeFavorites);
 
-  // Load library on startup
   loadLibrary();
 });
