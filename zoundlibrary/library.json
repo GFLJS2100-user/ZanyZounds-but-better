@@ -8,6 +8,15 @@
       "sampleRate": 8000,
       "favorite": false,
       "created": "2024-11-21"
+    }, 
+    {
+      "name": "Floatbeat example",
+      "author": "GFLJS2100",
+      "code": "sin((t/128*(t&t>>12))*PI/128)*sin((t/256*(t&t>>12))*PI/128)*(sin((t>>t/2)*PI/128))+sin((t*(42&t>>10))*PI/128)",
+      "mode": "floatbeat",
+      "sampleRate": 8000,
+      "favorite": false,
+      "created": "2024-11-21"
     }
   ]
 }
