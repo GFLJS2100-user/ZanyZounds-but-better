@@ -10,6 +10,13 @@
 <script src="main.js"></script>
 
 <body>
+<div id="libraryModal" class="modal">
+  <div class="modal-content">
+    <span class="close">&times;</span>
+    <h2>Zound Library</h2>
+    <div id="libraryItems"></div>
+  </div>
+</div>
 <div class="controls">
   <div id="editor"></div>
   <div class="input-row">
@@ -30,6 +37,7 @@
 <div class="button-container">
   <button class="btn">Listen to the code!</button>
   <button class="btn btn-stop">Stop the code!</button>
+  <button class="btn btn-library">Open Library</button>
 </div>
 <canvas id="waveform"></canvas>
 <br>
