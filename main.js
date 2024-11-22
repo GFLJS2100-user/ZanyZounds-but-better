@@ -235,55 +235,64 @@ function showError(message) {
 
 function bytebeat(t, formula) {
   try {
-    return eval(formula) % 256;
+    const result = eval(formula) % 256;
+    return isNaN(result) ? NaN : result; // Return NaN value (NaN) if NaN
   } catch (e) {
     console.error("Formula error:", e);
-    return 0;
+    return NaN; // Return center value on error
   }
 }
 
 function floatbeat(t, formula) {
   try {
-    return Math.max(-1, Math.min(1, eval(formula))); // Clamp output between -1 and 1
+    const result = eval(formula);
+    return isNaN(result) ? NaN : Math.max(-1, Math.min(1, result)); // Return 0 if NaN, otherwise clamp
   } catch (e) {
     console.error("Formula error:", e);
-    return 0;
+    return NaN; // Return center value on error
   }
 }
 
 function bitbeat(t, formula) {
   try {
-    return (eval(formula) & 1) ? 192 : 64;
+    const result = eval(formula);
+    return isNaN(result) ? NaN : ((result & 1) ? 192 : 64); // Return center value (128) if NaN
   } catch (e) {
     console.error("Formula error:", e);
-    return 0;
+    return NaN; // Return center value on error
   }
 }
 
 function logMode(t, formula) {
   try {
-    return Math.log2(Math.abs(eval(formula)) + 1) * 32 % 256;
+    const evalResult = eval(formula);
+    if (isNaN(evalResult)) return NaN; // Return center value if NaN
+    return Math.log2(Math.abs(evalResult) + 1) * 32 % 256;
   } catch (e) {
     console.error("Formula error:", e);
-    return 0;
+    return NaN; // Return center value on error
   }
 }
 
 function sinMode(t, formula) {
   try {
-    return Math.sin(eval(formula)) * 127 + 128;
+    const evalResult = eval(formula);
+    if (isNaN(evalResult)) return NaN; // Return center value if NaN
+    return Math.sin(evalResult) * 127 + 128;
   } catch (e) {
     console.error("Formula error:", e);
-    return 0;
+    return NaN; // Return center value on error
   }
 }
 
 function sinFMode(t, formula) {
   try {
-    return Math.sin(eval(formula) * Math.PI / 128);
+    const evalResult = eval(formula);
+    if (isNaN(evalResult)) return NaN; // Return center value if NaN
+    return Math.sin(evalResult * Math.PI / 128);
   } catch (e) {
     console.error("Formula error:", e);
-    return 0;
+    return NaN; // Return center value on error
   }
 }
 
@@ -599,4 +608,3 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Load library on startup
   loadLibrary();
-});
