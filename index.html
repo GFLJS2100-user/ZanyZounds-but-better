@@ -34,11 +34,15 @@
       <option value="floatbeat">FloatBeat</option>
       <option value="bitbeat">BitBeat</option>
       <option value="logmode">LogMode</option>
-      <option value="log10mode">Log10Mode</option>
       <option value="sinmode">SinMode</option>
       <option value="sinfmode">SinFMode</option>
     </select>
     <input type="number" id="sampleRate" value="44100" placeholder="Sample Rate (Hz)">
+  </div>
+  <div class="input-row">
+    <label for="volume">Volume:</label>
+    <input type="range" id="volume" min="0" max="100" value="50">
+    <span id="volumeValue">50%</span>
   </div>
 </div>
 <div id="errorMessage" class="error-message"></div>
