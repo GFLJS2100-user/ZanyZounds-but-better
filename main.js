@@ -242,24 +242,6 @@ function bytebeat(t, formula) {
   }
 }
 
-function signedBytebeat(t, formula) {
-  try {
-    return ((eval(formula) % 256) + 128) % 256;
-  } catch (e) {
-    console.error("Formula error:", e);
-    return 0;
-  }
-}
-
-function noLimitBytebeat(t, formula) {
-  try {
-    return eval(formula);
-  } catch (e) {
-    console.error("Formula error:", e);
-    return 0;
-  }
-}
-
 function bitbeat(t, formula) {
   try {
     return (eval(formula) & 1) ? 192 : 64;
@@ -333,14 +315,6 @@ function playByteBeat(code, sampleRate, mode) {
                   leftOutput[i] = (bytebeat(scaledT, channels[0].trim()) - 128) / 128.0;
                   rightOutput[i] = (bytebeat(scaledT, channels[1].trim()) - 128) / 128.0;
                   break;
-                case 'signed':
-                  leftOutput[i] = signedBytebeat(scaledT, channels[0].trim()) / 128.0;
-                  rightOutput[i] = signedBytebeat(scaledT, channels[1].trim()) / 128.0;
-                  break;
-                case 'nolimit':
-                  leftOutput[i] = noLimitBytebeat(scaledT, channels[0].trim()) / 32768.0;
-                  rightOutput[i] = noLimitBytebeat(scaledT, channels[1].trim()) / 32768.0;
-                  break;
                 case 'floatbeat':
                   leftOutput[i] = floatbeat(scaledT, channels[0].trim());
                   rightOutput[i] = floatbeat(scaledT, channels[1].trim());
@@ -369,12 +343,6 @@ function playByteBeat(code, sampleRate, mode) {
           switch(mode) {
             case 'bytebeat':
               value = (bytebeat(scaledT, code) - 128) / 128.0;
-              break;
-            case 'signed':
-              value = signedBytebeat(scaledT, code) / 128.0;
-              break;
-            case 'nolimit':
-              value = noLimitBytebeat(scaledT, code) / 32768.0; // Normalize large values
               break;
             case 'floatbeat':
               value = floatbeat(scaledT, code);
