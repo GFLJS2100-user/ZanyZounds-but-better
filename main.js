@@ -242,6 +242,15 @@ function bytebeat(t, formula) {
   }
 }
 
+function floatbeat(t, formula) {
+  try {
+    return Math.max(-1, Math.min(1, eval(formula))); // Clamp output between -1 and 1
+  } catch (e) {
+    console.error("Formula error:", e);
+    return 0;
+  }
+}
+
 function bitbeat(t, formula) {
   try {
     return (eval(formula) & 1) ? 192 : 64;
