@@ -10,6 +10,9 @@ let library = {
   items: []
 };
 
+let gainNode;
+let currentVolume = 0.5; // Default volume (50%)
+
 // Cookie handling functions
 function setCookie(name, value, days) {
   const d = new Date();
@@ -216,6 +219,8 @@ function updateCounter(t, sampleRate) {
 function initAudio() {
   audioContext = new (window.AudioContext || window.webkitAudioContext)();
   analyser = audioContext.createAnalyser();
+  gainNode = audioContext.createGain();
+  gainNode.gain.value = currentVolume;
   analyser.fftSize = 1024; // Changed from 2048 to 1024
 }
 
@@ -226,6 +231,69 @@ function showError(message) {
   setTimeout(() => {
     errorDiv.style.display = 'none';
   }, 5000); // Hide after 5 seconds
+}
+
+function bytebeat(t, formula) {
+  try {
+    return eval(formula) % 256;
+  } catch (e) {
+    console.error("Formula error:", e);
+    return 0;
+  }
+}
+
+function signedBytebeat(t, formula) {
+  try {
+    return ((eval(formula) % 256) - 128);
+  } catch (e) {
+    console.error("Formula error:", e);
+    return 0;
+  }
+}
+
+function noLimitBytebeat(t, formula) {
+  try {
+    return eval(formula);
+  } catch (e) {
+    console.error("Formula error:", e);
+    return 0;
+  }
+}
+
+function bitbeat(t, formula) {
+  try {
+    return (eval(formula) & 1) ? 192 : 64;
+  } catch (e) {
+    console.error("Formula error:", e);
+    return 0;
+  }
+}
+
+function logMode(t, formula) {
+  try {
+    return Math.log2(Math.abs(eval(formula)) + 1) * 32 % 256;
+  } catch (e) {
+    console.error("Formula error:", e);
+    return 0;
+  }
+}
+
+function sinMode(t, formula) {
+  try {
+    return Math.sin(eval(formula)) * 127 + 128;
+  } catch (e) {
+    console.error("Formula error:", e);
+    return 0;
+  }
+}
+
+function sinFMode(t, formula) {
+  try {
+    return Math.sin(eval(formula) * Math.PI / 128);
+  } catch (e) {
+    console.error("Formula error:", e);
+    return 0;
+  }
 }
 
 function playByteBeat(code, sampleRate, mode) {
@@ -245,25 +313,6 @@ function playByteBeat(code, sampleRate, mode) {
   startTime = Date.now();
   const timeScale = sampleRate / audioContext.sampleRate;
 
-  function bytebeat(t, formula) {
-    try {
-      return eval(formula) % 256;
-    } catch (e) {
-      console.error("Formula error:", e);
-      return 0;
-    }
-  }
-
-  function floatbeat(t, formula) {
-    try {
-      const result = eval(formula);
-      return Math.max(-1, Math.min(1, result)); // Clamp values
-    } catch (e) {
-      console.error("Formula error:", e);
-      return 0;
-    }
-  }
-  
   node.onaudioprocess = function(e) {
     const leftOutput = e.outputBuffer.getChannelData(0);
     const rightOutput = e.outputBuffer.getChannelData(1);
@@ -284,11 +333,34 @@ function playByteBeat(code, sampleRate, mode) {
                   leftOutput[i] = (bytebeat(scaledT, channels[0].trim()) - 128) / 128.0;
                   rightOutput[i] = (bytebeat(scaledT, channels[1].trim()) - 128) / 128.0;
                   break;
+                case 'signed':
+                  leftOutput[i] = signedBytebeat(scaledT, channels[0].trim()) / 128.0;
+                  rightOutput[i] = signedBytebeat(scaledT, channels[1].trim()) / 128.0;
+                  break;
+                case 'nolimit':
+                  leftOutput[i] = noLimitBytebeat(scaledT, channels[0].trim()) / 32768.0;
+                  rightOutput[i] = noLimitBytebeat(scaledT, channels[1].trim()) / 32768.0;
+                  break;
                 case 'floatbeat':
                   leftOutput[i] = floatbeat(scaledT, channels[0].trim());
                   rightOutput[i] = floatbeat(scaledT, channels[1].trim());
                   break;
-                // Add other modes as needed
+                case 'bitbeat':
+                  leftOutput[i] = (bitbeat(scaledT, channels[0].trim()) - 128) / 128.0;
+                  rightOutput[i] = (bitbeat(scaledT, channels[1].trim()) - 128) / 128.0;
+                  break;
+                case 'logmode':
+                  leftOutput[i] = (logMode(scaledT, channels[0].trim()) - 128) / 128.0;
+                  rightOutput[i] = (logMode(scaledT, channels[1].trim()) - 128) / 128.0;
+                  break;
+                case 'sinmode':
+                  leftOutput[i] = (sinMode(scaledT, channels[0].trim()) - 128) / 128.0;
+                  rightOutput[i] = (sinMode(scaledT, channels[1].trim()) - 128) / 128.0;
+                  break;
+                case 'sinfmode':
+                  leftOutput[i] = sinFMode(scaledT, channels[0].trim());
+                  rightOutput[i] = sinFMode(scaledT, channels[1].trim());
+                  break;
               }
             }
           }
@@ -298,10 +370,29 @@ function playByteBeat(code, sampleRate, mode) {
             case 'bytebeat':
               value = (bytebeat(scaledT, code) - 128) / 128.0;
               break;
+            case 'signed':
+              value = signedBytebeat(scaledT, code) / 128.0;
+              break;
+            case 'nolimit':
+              value = noLimitBytebeat(scaledT, code) / 32768.0; // Normalize large values
+              break;
             case 'floatbeat':
               value = floatbeat(scaledT, code);
               break;
-            // Add other modes as needed
+            case 'bitbeat':
+              value = (bitbeat(scaledT, code) - 128) / 128.0;
+              break;
+            case 'logmode':
+              value = (logMode(scaledT, code) - 128) / 128.0;
+              break;
+            case 'sinmode':
+              value = (sinMode(scaledT, code) - 128) / 128.0;
+              break;
+            case 'sinfmode':
+              value = sinFMode(scaledT, code);
+              break;
+            default:
+              value = 0;
           }
           leftOutput[i] = rightOutput[i] = value;
         }
@@ -322,67 +413,24 @@ function playByteBeat(code, sampleRate, mode) {
     }
   };
 
+  // Modify the connection chain
   node.connect(analyser);
-  analyser.connect(audioContext.destination);
+  analyser.connect(gainNode);
+  gainNode.connect(audioContext.destination);
   currentNode = node;
   isPlaying = true;
   drawWaveform();
 }
 
-function drawWaveform() {
-  const canvas = document.getElementById('waveform');
-  const ctx = canvas.getContext('2d');
-  const bufferLength = analyser.frequencyBinCount;
-  const dataArray = new Uint8Array(bufferLength);
-
-  // Set canvas dimensions accounting for device pixel ratio
-  const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
-  ctx.scale(dpr, dpr);
-
-  function draw() {
-    if (!isPlaying) return;
-    requestAnimationFrame(draw);
-
-    analyser.getByteTimeDomainData(dataArray);
-
-    ctx.fillStyle = '#333';
-    ctx.fillRect(0, 0, rect.width, rect.height);
-
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#61decd';
-    ctx.beginPath();
-
-    const sliceWidth = rect.width / bufferLength;
-    let x = 0;
-
-    for (let i = 0; i < bufferLength; i++) {
-      const v = 1 - dataArray[i] / 128.0;
-      const y = (v + 1) * rect.height / 2;
-
-      if (i === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
-
-      x += sliceWidth;
-    }
-
-    ctx.lineTo(rect.width, rect.height / 2);
-    ctx.stroke();
-  }
-
-  draw();
-}
-
-// Add a function to handle stopping the sound and clearing the waveform
 function stopSound() {
   if (currentNode) {
     currentNode.disconnect();
     currentNode = null;
+  }
+  if (gainNode) {
+    gainNode.disconnect();
+    gainNode = audioContext.createGain();
+    gainNode.gain.value = currentVolume;
   }
   isPlaying = false;
 
@@ -391,6 +439,53 @@ function stopSound() {
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#333';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+function drawWaveform() {
+  if (!isPlaying) return;
+  
+  const canvas = document.getElementById('waveform');
+  const ctx = canvas.getContext('2d');
+  
+  // Resize canvas to match its display size
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+  
+  // Get frequency data
+  const bufferLength = analyser.frequencyBinCount;
+  const dataArray = new Uint8Array(bufferLength);
+  analyser.getByteTimeDomainData(dataArray);
+  
+  // Clear canvas
+  ctx.fillStyle = '#333';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Draw waveform
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#61decd';
+  ctx.beginPath();
+  
+  const sliceWidth = canvas.width * 1.0 / bufferLength;
+  let x = 0;
+  
+  for (let i = 0; i < bufferLength; i++) {
+    const v = 1 - dataArray[i] / 128.0;
+    const y = (v + 1) * canvas.height / 2;
+    
+    if (i === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+    
+    x += sliceWidth;
+  }
+  
+  ctx.lineTo(canvas.width, canvas.height / 2);
+  ctx.stroke();
+  
+  // Request next frame
+  requestAnimationFrame(drawWaveform);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -470,6 +565,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter') {
       saveState();
       updateSound();
+    }
+  });
+
+  // Add volume control
+  const volumeSlider = document.getElementById('volume');
+  const volumeValue = document.getElementById('volumeValue');
+  
+  volumeSlider.addEventListener('input', (e) => {
+    currentVolume = e.target.value / 100;
+    volumeValue.textContent = `${e.target.value}%`;
+    if (gainNode) {
+      gainNode.gain.value = currentVolume;
     }
   });
 
