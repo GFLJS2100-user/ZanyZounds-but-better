@@ -239,7 +239,7 @@ function bytebeat(t, formula) {
     return isNaN(result) ? NaN : result; // Return NaN value (NaN) if NaN
   } catch (e) {
     console.error("Formula error:", e);
-    return NaN; // Return center value on error
+    return 0; // Return center value on error
   }
 }
 
@@ -249,7 +249,7 @@ function floatbeat(t, formula) {
     return isNaN(result) ? NaN : Math.max(-1, Math.min(1, result)); // Return 0 if NaN, otherwise clamp
   } catch (e) {
     console.error("Formula error:", e);
-    return NaN; // Return center value on error
+    return 0; // Return center value on error
   }
 }
 
@@ -259,7 +259,7 @@ function bitbeat(t, formula) {
     return isNaN(result) ? NaN : ((result & 1) ? 192 : 64); // Return center value (128) if NaN
   } catch (e) {
     console.error("Formula error:", e);
-    return NaN; // Return center value on error
+    return 0; // Return center value on error
   }
 }
 
@@ -270,7 +270,7 @@ function logMode(t, formula) {
     return Math.log2(Math.abs(evalResult) + 1) * 32 % 256;
   } catch (e) {
     console.error("Formula error:", e);
-    return NaN; // Return center value on error
+    return 0; // Return center value on error
   }
 }
 
@@ -281,7 +281,7 @@ function sinMode(t, formula) {
     return Math.sin(evalResult) * 127 + 128;
   } catch (e) {
     console.error("Formula error:", e);
-    return NaN; // Return center value on error
+    return 0; // Return center value on error
   }
 }
 
@@ -292,7 +292,7 @@ function sinFMode(t, formula) {
     return Math.sin(evalResult * Math.PI / 128);
   } catch (e) {
     console.error("Formula error:", e);
-    return NaN; // Return center value on error
+    return 0; // Return center value on error
   }
 }
 
