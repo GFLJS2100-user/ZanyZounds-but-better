@@ -148,7 +148,7 @@ function loadPreset(item) {
   }
   
   // Set the editor value
-  editor.setValue(preset.code || '', -1);
+  editor.setValue(preset.code || '');
   
   // Set mode and sample rate if they exist
   if (preset.mode) {
@@ -472,10 +472,16 @@ function drawWaveform() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  editor = ace.edit("editor");
-  editor.setTheme("ace/theme/monokai");
-  editor.session.setMode("ace/mode/javascript");
-  editor.setFontSize(16);
+  editor = CodeMirror(document.getElementById('editor'), {
+    mode: "javascript",
+    theme: "liquibyte",
+    lineNumbers: true,
+    lineWrapping: true,
+    indentUnit: 2,
+    tabSize: 2,
+    autofocus: true,
+    value: ""
+  });
 
   // Set default code if no code in URL
   const defaultCode = 't%(t^t>>8)^t>>8|t>>6';
@@ -486,9 +492,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Load code
   if (urlParams.has('code')) {
     const code = decodeURIComponent(urlParams.get('code'));
-    editor.setValue(code, -1);
+    editor.setValue(code);
   } else {
-    editor.setValue(defaultCode, -1);
+    editor.setValue(defaultCode);
   }
 
   // Load mode
@@ -535,7 +541,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // Update on code changes
-  editor.session.on('change', debouncedSave);
+  editor.on('change', debouncedSave);
 
   // Update on mode changes
   document.getElementById('mode').addEventListener('change', () => {
@@ -564,7 +570,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   window.addEventListener('resize', () => {
-    editor.resize();
+    editor.refresh();
   });
 
   const playButton = document.querySelector('.btn');
