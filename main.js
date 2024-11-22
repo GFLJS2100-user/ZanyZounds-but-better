@@ -244,7 +244,7 @@ function bytebeat(t, formula) {
 
 function signedBytebeat(t, formula) {
   try {
-    return ((eval(formula) % 256) - 128);
+    return ((eval(formula) % 256) + 128) % 256;
   } catch (e) {
     console.error("Formula error:", e);
     return 0;
