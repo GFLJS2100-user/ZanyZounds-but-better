@@ -148,7 +148,7 @@ function loadPreset(item) {
   }
   
   // Set the editor value
-  editor.setValue(preset.code || '');
+  editor.setValue(preset.code || '', -1);
   
   // Set mode and sample rate if they exist
   if (preset.mode) {
@@ -472,15 +472,10 @@ function drawWaveform() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  editor = CodeMirror(document.getElementById('editor'), {
-    mode: 'javascript',
-    theme: 'monokai',
-    lineNumbers: true,
-    indentUnit: 2,
-    tabSize: 2,
-    lineWrapping: true,
-    value: '' // Initial empty value
-  });
+  editor = ace.edit("editor");
+  editor.setTheme("ace/theme/monokai");
+  editor.session.setMode("ace/mode/javascript");
+  editor.setFontSize(16);
 
   // Set default code if no code in URL
   const defaultCode = 't%(t^t>>8)^t>>8|t>>6';
@@ -491,9 +486,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Load code
   if (urlParams.has('code')) {
     const code = decodeURIComponent(urlParams.get('code'));
-    editor.setValue(code);
+    editor.setValue(code, -1);
   } else {
-    editor.setValue(defaultCode);
+    editor.setValue(defaultCode, -1);
   }
 
   // Load mode
@@ -540,7 +535,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // Update on code changes
-  editor.on('change', debouncedSave);
+  editor.session.on('change', debouncedSave);
 
   // Update on mode changes
   document.getElementById('mode').addEventListener('change', () => {
@@ -569,7 +564,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   window.addEventListener('resize', () => {
-    editor.refresh();
+    editor.resize();
   });
 
   const playButton = document.querySelector('.btn');
@@ -610,4 +605,3 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Load library on startup
   loadLibrary();
-});
