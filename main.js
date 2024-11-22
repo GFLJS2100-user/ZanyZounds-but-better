@@ -473,14 +473,13 @@ function drawWaveform() {
 
 document.addEventListener('DOMContentLoaded', () => {
   editor = CodeMirror(document.getElementById('editor'), {
-    mode: "javascript",
-    theme: "monokai",
+    mode: 'javascript',
+    theme: 'monokai',
     lineNumbers: true,
-    lineWrapping: true,
     indentUnit: 2,
     tabSize: 2,
-    autofocus: true,
-    value: ""
+    lineWrapping: true,
+    value: '' // Initial empty value
   });
 
   // Set default code if no code in URL
