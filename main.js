@@ -474,7 +474,7 @@ function drawWaveform() {
 document.addEventListener('DOMContentLoaded', () => {
   editor = CodeMirror(document.getElementById('editor'), {
     mode: "javascript",
-    theme: "liquibyte",
+    theme: "zanyZoundsTheme",
     lineNumbers: true,
     lineWrapping: true,
     indentUnit: 2,
