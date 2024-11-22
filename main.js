@@ -6,60 +6,6 @@ let oscillator = null;
 let editor;
 let startTime;
 
-// Enhanced Math functions
-const mathFunctions = {
-  sin: Math.sin,
-  cos: Math.cos,
-  tan: Math.tan,
-  asin: Math.asin,
-  acos: Math.acos,
-  atan: Math.atan,
-  atan2: Math.atan2,
-  sinh: Math.sinh,
-  cosh: Math.cosh,
-  tanh: Math.tanh,
-  asinh: Math.asinh,
-  acosh: Math.acosh,
-  atanh: Math.atanh,
-  abs: Math.abs,
-  floor: Math.floor,
-  ceil: Math.ceil,
-  round: Math.round,
-  trunc: Math.trunc,
-  sign: Math.sign,
-  int: Math.floor,
-  sqrt: Math.sqrt,
-  cbrt: Math.cbrt,
-  log: Math.log,
-  log2: Math.log2,
-  log10: Math.log10,
-  exp: Math.exp,
-  pow: Math.pow,
-  min: Math.min,
-  max: Math.max,
-  random: Math.random,
-  PI: Math.PI,
-  E: Math.E,
-  SQRT2: Math.SQRT2,
-  SQRT1_2: Math.SQRT1_2,
-  LN2: Math.LN2,
-  LN10: Math.LN10,
-  clamp: (num, min, max) => Math.min(Math.max(num, min), max),
-  lerp: (start, end, amt) => (1-amt)*start + amt*end,
-  map: (value, start1, stop1, start2, stop2) => 
-    start2 + (stop2 - start2) * ((value - start1) / (stop1 - start1)),
-  smooth: (x) => x * x * (3 - 2 * x),
-  wrap: (x, min, max) => min + ((x - min) % (max - min)),
-  noise: (x) => Math.sin(x * 12.9898 + x * 78.233) * 43758.5453 % 1,
-  saw: (x) => (x % 1) * 2 - 1,
-  square: (x) => Math.sin(x) >= 0 ? 1 : -1,
-  triangle: (x) => Math.abs(((x % 1) * 4 - 2)) - 1,
-  pulse: (x, width = 0.5) => ((x % 1) < width) ? 1 : -1,
-  dist: (x, y) => Math.sqrt(x*x + y*y),
-  fract: (x) => x - Math.floor(x),
-  mix: (a, b, t) => a * (1 - t) + b * t,
-};
-
 let library = {
   items: []
 };
@@ -254,7 +200,17 @@ function renderLibrary() {
 function updateCounter(t, sampleRate) {
   const counterElement = document.getElementById('counter');
   const seconds = t / sampleRate;
-  counterElement.textContent = `Time: ${t.toLocaleString()} samples (${seconds.toFixed(2)} seconds)`;
+  
+  // Get current code size in bytes
+  const code = editor.getValue();
+  const bytes = new Blob([code]).size;
+  const kb = bytes / 1024;
+  const mb = kb / 1024;
+  const gb = mb / 1024;
+  const tb = gb / 1024;
+  
+  const sizeText = `Size: ${bytes.toFixed(0)} B | ${kb.toFixed(2)} KB | ${mb.toFixed(3)} MB | ${gb.toFixed(4)} GB | ${tb.toFixed(5)} TB`;
+  counterElement.textContent = `Time: ${t.toLocaleString()} samples (${seconds.toFixed(2)} seconds) | ${sizeText}`;
 }
 
 function initAudio() {
@@ -273,17 +229,40 @@ function showError(message) {
 }
 
 function playByteBeat(code, sampleRate, mode) {
+  // Add Math functions to global scope
+  for (let name of Object.getOwnPropertyNames(Math)) {
+    globalThis[name] = Math[name];
+  }
+
   if (currentNode) {
     currentNode.disconnect();
   }
 
-  const bufferSize = 256;
-  // Change to stereo output (2 channels)
+  const bufferSize = 4096;
   const node = audioContext.createScriptProcessor(bufferSize, 1, 2);
   
   let t = 0;
   startTime = Date.now();
   const timeScale = sampleRate / audioContext.sampleRate;
+
+  function bytebeat(t, formula) {
+    try {
+      return eval(formula) % 256;
+    } catch (e) {
+      console.error("Formula error:", e);
+      return 0;
+    }
+  }
+
+  function floatbeat(t, formula) {
+    try {
+      const result = eval(formula);
+      return Math.max(-1, Math.min(1, result)); // Clamp values
+    } catch (e) {
+      console.error("Formula error:", e);
+      return 0;
+    }
+  }
   
   node.onaudioprocess = function(e) {
     const leftOutput = e.outputBuffer.getChannelData(0);
@@ -291,96 +270,53 @@ function playByteBeat(code, sampleRate, mode) {
     
     for (let i = 0; i < bufferSize; i++) {
       try {
-        const scaledT = Math.floor(t * timeScale);
-        
-        // Check if code contains array syntax [left,right]
-        let leftValue, rightValue;
-        
+        const scaledT = Math.floor(t);
+        let value;
+
         if (code.includes('[') && code.includes(']')) {
-          // Parse array syntax for stereo
+          // Handle stereo code
           const stereoCode = code.trim();
           if (stereoCode.startsWith('[') && stereoCode.endsWith(']')) {
             const channels = stereoCode.slice(1, -1).split(',');
             if (channels.length === 2) {
-              const leftFn = new Function(...Object.keys(mathFunctions), 't', `return ${channels[0].trim()};`);
-              const rightFn = new Function(...Object.keys(mathFunctions), 't', `return ${channels[1].trim()};`);
-              
-              leftValue = leftFn(...Object.values(mathFunctions), scaledT) || 0;
-              rightValue = rightFn(...Object.values(mathFunctions), scaledT) || 0;
-            } else {
-              throw new Error('Stereo code must have exactly two channels');
+              switch(mode) {
+                case 'bytebeat':
+                  leftOutput[i] = (bytebeat(scaledT, channels[0].trim()) - 128) / 128.0;
+                  rightOutput[i] = (bytebeat(scaledT, channels[1].trim()) - 128) / 128.0;
+                  break;
+                case 'floatbeat':
+                  leftOutput[i] = floatbeat(scaledT, channels[0].trim());
+                  rightOutput[i] = floatbeat(scaledT, channels[1].trim());
+                  break;
+                // Add other modes as needed
+              }
             }
           }
         } else {
-          // Mono code - same value for both channels
-          const fn = new Function(...Object.keys(mathFunctions), 't', `return ${code};`);
-          leftValue = rightValue = fn(...Object.values(mathFunctions), scaledT) || 0;
+          // Handle mono code
+          switch(mode) {
+            case 'bytebeat':
+              value = (bytebeat(scaledT, code) - 128) / 128.0;
+              break;
+            case 'floatbeat':
+              value = floatbeat(scaledT, code);
+              break;
+            // Add other modes as needed
+          }
+          leftOutput[i] = rightOutput[i] = value;
         }
 
-        // Process values based on mode
-        if (mode === 'floatbeat') {
-          leftValue = Math.max(-1, Math.min(1, leftValue));
-          rightValue = Math.max(-1, Math.min(1, rightValue));
-        } else if (mode === 'bitbeat') {
-          leftValue = ((leftValue & 1) ? 192 : 64);
-          rightValue = ((rightValue & 1) ? 192 : 64);
-          leftValue = (leftValue - 128) / 128;
-          rightValue = (rightValue - 128) / 128;
-        } else if (mode === 'logmode') {
-          leftValue = Math.log2(Math.abs(leftValue) + 1) * 32;
-          rightValue = Math.log2(Math.abs(rightValue) + 1) * 32;
-          leftValue = Math.max(-1, Math.min(1, (leftValue % 256 - 128) / 128));
-          rightValue = Math.max(-1, Math.min(1, (rightValue % 256 - 128) / 128));
-        } else if (mode === 'sinmode') {
-          leftValue = Math.sin(leftValue);
-          rightValue = Math.sin(rightValue);
-        } else if (mode === 'log10mode') {
-          leftValue = Math.log10(Math.abs(leftValue) + 1) * 32;
-          rightValue = Math.log10(Math.abs(rightValue) + 1) * 32;
-          leftValue = Math.max(-1, Math.min(1, (leftValue % 256 - 128) / 128));
-          rightValue = Math.max(-1, Math.min(1, (rightValue % 256 - 128) / 128));
-        } else if (mode === 'sinfmode') {
-          leftValue = Math.sin(leftValue * Math.PI / 128);
-          rightValue = Math.sin(rightValue * Math.PI / 128);
-        } else if (mode === 'nolimit') {
-          leftValue = Math.floor(leftValue);
-          rightValue = Math.floor(rightValue);
-          leftValue = (leftValue - 128) / 128;
-          rightValue = (rightValue - 128) / 128;
-        } else if (mode === 'signed') {
-          leftValue = Math.floor(leftValue);
-          rightValue = Math.floor(rightValue);
-          leftValue = ((leftValue % 256) + 256) % 256;
-          rightValue = ((rightValue % 256) + 256) % 256;
-          leftValue = ((leftValue + 128) % 256 - 128) / 128;
-          rightValue = ((rightValue + 128) % 256 - 128) / 128;
-        } else {
-          // Original Bytebeat mode
-          leftValue = Math.floor(leftValue);
-          rightValue = Math.floor(rightValue);
-          leftValue = ((leftValue % 256) + 256) % 256;
-          rightValue = ((rightValue % 256) + 256) % 256;
-          leftValue = (leftValue - 128) / 128;
-          rightValue = (rightValue - 128) / 128;
-        }
-        
-        leftOutput[i] = leftValue;
-        rightOutput[i] = rightValue;
-        t++;
+        t += timeScale;
         
         if (i === 0) {
-          updateCounter(Math.floor(t * timeScale), sampleRate);
+          updateCounter(Math.floor(t), sampleRate);
         }
       } catch (err) {
         console.error('Error in audio processing:', err);
-        leftOutput[i] = 0;
-        rightOutput[i] = 0;
+        leftOutput[i] = rightOutput[i] = 0;
         
-        // Only show error once when it first occurs
         if (i === 0) {
           showError(err.message);
-          // Optional: stop playback on error
-          // stopSound();
         }
       }
     }
@@ -393,63 +329,68 @@ function playByteBeat(code, sampleRate, mode) {
   drawWaveform();
 }
 
+function drawWaveform() {
+  const canvas = document.getElementById('waveform');
+  const ctx = canvas.getContext('2d');
+  const bufferLength = analyser.frequencyBinCount;
+  const dataArray = new Uint8Array(bufferLength);
+
+  // Set canvas dimensions accounting for device pixel ratio
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+
+  function draw() {
+    if (!isPlaying) return;
+    requestAnimationFrame(draw);
+
+    analyser.getByteTimeDomainData(dataArray);
+
+    ctx.fillStyle = '#333';
+    ctx.fillRect(0, 0, rect.width, rect.height);
+
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#61decd';
+    ctx.beginPath();
+
+    const sliceWidth = rect.width / bufferLength;
+    let x = 0;
+
+    for (let i = 0; i < bufferLength; i++) {
+      const v = 1 - dataArray[i] / 128.0;
+      const y = (v + 1) * rect.height / 2;
+
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+
+      x += sliceWidth;
+    }
+
+    ctx.lineTo(rect.width, rect.height / 2);
+    ctx.stroke();
+  }
+
+  draw();
+}
+
+// Add a function to handle stopping the sound and clearing the waveform
 function stopSound() {
   if (currentNode) {
     currentNode.disconnect();
     currentNode = null;
   }
   isPlaying = false;
-}
 
-function drawWaveform() {
+  // Clear waveform
   const canvas = document.getElementById('waveform');
-  canvas.width = canvas.offsetWidth;
-  canvas.height = canvas.offsetHeight;
-
-  const canvasCtx = canvas.getContext('2d');
-  canvasCtx.imageSmoothingEnabled = false;
-
-  const width = canvas.width;
-  const height = canvas.height;
-  const bufferLength = analyser.frequencyBinCount;
-  const dataArray = new Uint8Array(bufferLength);
-
-  function draw() {
-    if (!isPlaying) return;
-
-    requestAnimationFrame(draw);
-
-    analyser.getByteTimeDomainData(dataArray);
-
-    canvasCtx.fillStyle = 'rgb(20, 20, 20)';
-    canvasCtx.fillRect(0, 0, width, height);
-
-    canvasCtx.lineWidth = 1;
-    canvasCtx.strokeStyle = 'rgb(0, 255, 0)';
-
-    canvasCtx.beginPath();
-
-    const sliceWidth = width * 1.0 / bufferLength;
-    let x = 0;
-
-    for (let i = 0; i < bufferLength; i++) {
-      const v = dataArray[i] / 128.0;
-      const y = height - (v * height / 2);
-
-      if (i === 0) {
-        canvasCtx.moveTo(x, y);
-      } else {
-        canvasCtx.lineTo(x, y);
-      }
-
-      x += sliceWidth;
-    }
-
-    canvasCtx.lineTo(width, height / 2);
-    canvasCtx.stroke();
-  }
-
-  draw();
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#333';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -466,7 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Load code
   if (urlParams.has('code')) {
-    const code = atob(urlParams.get('code'));
+    const code = decodeURIComponent(urlParams.get('code'));
     editor.setValue(code, -1);
   } else {
     editor.setValue(defaultCode, -1);
@@ -490,7 +431,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sampleRate = document.getElementById('sampleRate').value;
 
     const newUrl = new URL(window.location.origin + window.location.pathname);
-    newUrl.searchParams.set('code', btoa(code));
+    newUrl.searchParams.set('code', encodeURIComponent(code));
     newUrl.searchParams.set('mode', mode);
     newUrl.searchParams.set('sampleRate', sampleRate);
 
