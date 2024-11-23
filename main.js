@@ -33,46 +33,49 @@ function resumeAudioContext() {
 
 function drawWaveform() {
     const canvas = document.getElementById('waveform');
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
+    const width = canvas.offsetWidth;
+    const height = canvas.offsetHeight;
+    
+    // Only update canvas dimensions when needed
+    if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+    }
 
-    const canvasCtx = canvas.getContext('2d');
+    const canvasCtx = canvas.getContext('2d', { alpha: false });
     canvasCtx.imageSmoothingEnabled = false;
-
-    const width = canvas.width;
-    const height = canvas.height;
+    
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
+    const sliceWidth = width / bufferLength;
 
     function draw() {
         if (!isPlaying) return;
-
+        
         requestAnimationFrame(draw);
-
         analyser.getByteTimeDomainData(dataArray);
 
         canvasCtx.fillStyle = 'rgb(20, 20, 20)';
         canvasCtx.fillRect(0, 0, width, height);
-
         canvasCtx.lineWidth = 1;
         canvasCtx.strokeStyle = 'rgb(0, 255, 0)';
-
         canvasCtx.beginPath();
 
-        const sliceWidth = width * 1.0 / bufferLength;
+        // Optimize drawing by sampling fewer points
+        const skip = Math.max(1, Math.floor(bufferLength / width));
         let x = 0;
 
-        for (let i = 0; i < bufferLength; i++) {
+        for (let i = 0; i < bufferLength; i += skip) {
             const v = dataArray[i] / 128.0;
             const y = height - (v * height / 2);
-
+            
             if (i === 0) {
                 canvasCtx.moveTo(x, y);
             } else {
                 canvasCtx.lineTo(x, y);
             }
-
-            x += sliceWidth;
+            
+            x += sliceWidth * skip;
         }
 
         canvasCtx.lineTo(width, height / 2);
@@ -164,14 +167,19 @@ function loadFromURL() {
 function updateCounters() {
     if (!isPlaying) return;
     
-    const seconds = sampleTime / currentSampleRate;
-    const codeSize = new Blob([editor.getValue()]).size;
-    
-    document.getElementById('counter-display').innerHTML = `
-        Time: ${seconds.toFixed(2)}s<br>
-        Samples: ${Math.floor(sampleTime)}<br>
-        Code Size: ${formatBytes(codeSize)}
-    `;
+    // Only update every 100ms instead of every frame
+    if (!updateCounters.lastUpdate || Date.now() - updateCounters.lastUpdate > 100) {
+        const seconds = sampleTime / currentSampleRate;
+        const codeSize = new Blob([editor.getValue()]).size;
+        
+        document.getElementById('counter-display').innerHTML = `
+            Time: ${seconds.toFixed(2)}s<br>
+            Samples: ${Math.floor(sampleTime)}<br>
+            Code Size: ${formatBytes(codeSize)}
+        `;
+        
+        updateCounters.lastUpdate = Date.now();
+    }
     
     requestAnimationFrame(updateCounters);
 }
@@ -213,36 +221,43 @@ function startAudio(formula) {
 
     let lastValidOutput = 0; // Keep track of last valid output to prevent clicks
 
+    // Optimized audio processing
     processor.onaudioprocess = (e) => {
         const output = e.outputBuffer.getChannelData(0);
+        const t_start = Math.floor(sampleTime);
         
-        for (let i = 0; i < output.length; i++) {
-            const t = Math.floor(sampleTime);
-            try {
-                if (currentMode === 'byte') {
-                    // Bytebeat mode with error handling
-                    const value = fn(t);
-                    if (isNaN(value) || !isFinite(value)) {
-                        output[i] = lastValidOutput;
-                    } else {
-                        output[i] = ((value & 255) - 128) / 128.0;
-                        lastValidOutput = output[i];
-                    }
-                } else {
-                    // Floatbeat mode with error handling
-                    const value = fn(t);
-                    if (isNaN(value) || !isFinite(value)) {
-                        output[i] = lastValidOutput;
-                    } else {
-                        output[i] = Math.max(-1, Math.min(1, value));
-                        lastValidOutput = output[i];
+        // Process in chunks for better performance
+        const chunkSize = 128;
+        for (let i = 0; i < output.length; i += chunkSize) {
+            const end = Math.min(i + chunkSize, output.length);
+            
+            if (currentMode === 'byte') {
+                for (let j = i; j < end; j++) {
+                    try {
+                        const value = fn(t_start + Math.floor(j * sampleRateRatio));
+                        output[j] = isNaN(value) || !isFinite(value) 
+                            ? lastValidOutput 
+                            : ((value & 255) - 128) / 128.0;
+                        lastValidOutput = output[j];
+                    } catch (err) {
+                        output[j] = lastValidOutput;
                     }
                 }
-            } catch (err) {
-                output[i] = lastValidOutput; // Use last valid output instead of silence
+            } else {
+                for (let j = i; j < end; j++) {
+                    try {
+                        const value = fn(t_start + Math.floor(j * sampleRateRatio));
+                        output[j] = isNaN(value) || !isFinite(value)
+                            ? lastValidOutput
+                            : Math.max(-1, Math.min(1, value));
+                        lastValidOutput = output[j];
+                    } catch (err) {
+                        output[j] = lastValidOutput;
+                    }
+                }
             }
-            sampleTime += sampleRateRatio;
         }
+        sampleTime += output.length * sampleRateRatio;
     };
 
     processor.connect(analyser);
