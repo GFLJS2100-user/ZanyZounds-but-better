@@ -23,7 +23,7 @@ body {
   margin-bottom: 10px;
 }
 
-select, input[type="number"] {
+select, input[type="number"], input[type="range"] {
   width: min(200px, 45vw);
   padding: 10px;
   border-radius: 10px;
@@ -211,6 +211,23 @@ select, input[type="number"] {
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+#volume {
+  width: min(200px, 45vw);
+  margin: 0 10px;
+  accent-color: #2a9d8f;
+}
+
+label[for="volume"] {
+  color: #fff;
+  font-size: 16px;
+}
+
+#volumeValue {
+  color: #fff;
+  font-size: 16px;
+  min-width: 50px;
 }
 
 @media (max-width: 600px) {
