@@ -606,3 +606,4 @@ document.addEventListener('DOMContentLoaded', () => {
   // Load library on startup
   loadLibrary();
 });
+
