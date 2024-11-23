@@ -4,7 +4,7 @@
       "name": "Example bytebeat",
       "author": "GFLJS2100",
       "code": "(((t*(t>>12|8)&t>>4^t>>7^t>>4|t*(t>>12|t>>9))%256/2+64)+((8E3/(t&4095))+128))+128",
-      "mode": "byte",
+      "mode": "bytebeat",
       "sampleRate": 8000,
       "date": "2024-11-21"
     }, 
@@ -12,7 +12,7 @@
       "name": "Floatbeat example",
       "author": "GFLJS2100",
       "code": "sin((t/128*(t&t>>12))*PI/128)*sin((t/256*(t&t>>12))*PI/128)*(sin((t>>t/2)*PI/128))+sin((t*(42&t>>10))*PI/128)",
-      "mode": "float",
+      "mode": "floatbeat",
       "sampleRate": 8000,
       "date": "2024-11-21"
     }, 
