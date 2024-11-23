@@ -21,7 +21,7 @@
     width: 90vw;
     max-width: 800px;
     height: 150px;
-    background: #264653;
+    background: rgb(20, 20, 20);
     margin: 20px 0;
     border-radius: 10px;
   }
@@ -261,44 +261,41 @@
   }
 
   .volume-control {
-    width: 120px;
-    height: 40px;
+    display: flex;
+    align-items: center;
     margin: 10px;
-    padding: 5px;
+  }
+
+  .volume-control input[type="range"] {
+    -webkit-appearance: none;
+    width: 120px;
+    height: 4px;
     background: #264653;
-    border-radius: 10px;
-    -webkit-appearance: none;
-    appearance: none;
+    border-radius: 2px;
+    margin: 0;
   }
 
-  .volume-control::-webkit-slider-thumb {
+  .volume-control input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
-    appearance: none;
-    width: 20px;
-    height: 20px;
+    width: 16px;
+    height: 16px;
     background: #2a9d8f;
     border-radius: 50%;
     cursor: pointer;
-    border: 2px solid #76e084;
-    transition: all 0.3s ease;
+    transition: background 0.3s ease;
   }
 
-  .volume-control::-webkit-slider-thumb:hover {
+  .volume-control input[type="range"]::-webkit-slider-thumb:hover {
     background: #61decd;
-    transform: scale(1.1);
   }
 
-  .volume-control::-moz-range-thumb {
-    width: 20px;
-    height: 20px;
-    background: #2a9d8f;
-    border-radius: 50%;
-    cursor: pointer;
-    border: 2px solid #76e084;
-    transition: all 0.3s ease;
-  }
-
-  .volume-control::-moz-range-thumb:hover {
-    background: #61decd;
-    transform: scale(1.1);
+  /* Add to the existing media query for small screens */
+  @media (max-width: 480px) {
+    .volume-control {
+      width: 100%;
+    }
+    
+    .volume-control input[type="range"] {
+      width: 100%;
+    }
   }
