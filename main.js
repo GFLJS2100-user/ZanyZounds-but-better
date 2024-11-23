@@ -25,6 +25,12 @@ function initAudio() {
     analyser.fftSize = 4096;
 }
 
+function resumeAudioContext() {
+    if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+}
+
 function drawWaveform() {
     const canvas = document.getElementById('waveform');
     canvas.width = canvas.offsetWidth;
@@ -82,7 +88,7 @@ function bytebeat(t, formula) {
         return fn(t) & 255;
     } catch (e) {
         console.error("Formula error:", e);
-        return 0;
+        return 128; // Return middle value instead of 0 to reduce audio popping
     }
 }
 
@@ -90,7 +96,7 @@ function floatbeat(t, formula) {
     try {
         const fn = new Function("t", `return ${formula};`);
         const result = fn(t);
-        return Math.max(-1, Math.min(1, result)); // Clamp values
+        return Math.max(-1, Math.min(1, result));
     } catch (e) {
         console.error("Formula error:", e);
         return 0;
@@ -185,6 +191,8 @@ function updateSampleRate() {
 function startAudio(formula) {
     if (!audioCtx) initAudio();
     
+    resumeAudioContext();
+    
     if (isPlaying) {
         processor.disconnect();
     }
@@ -193,29 +201,45 @@ function startAudio(formula) {
     sampleTime = 0;
     currentMode = document.getElementById('mode-select').value;
 
-    // Create function from formula
+    // Create function from formula with error handling
     let fn;
     try {
         fn = new Function("t", `return ${formula};`);
     } catch (e) {
         console.error("Invalid formula:", e);
-        return;
+        // Don't return - continue with a default function that produces silence
+        fn = (t) => currentMode === 'byte' ? 128 : 0;
     }
+
+    let lastValidOutput = 0; // Keep track of last valid output to prevent clicks
 
     processor.onaudioprocess = (e) => {
         const output = e.outputBuffer.getChannelData(0);
+        
         for (let i = 0; i < output.length; i++) {
             const t = Math.floor(sampleTime);
             try {
                 if (currentMode === 'byte') {
-                    // Bytebeat mode
-                    output[i] = ((fn(t) & 255) - 128) / 128.0;
+                    // Bytebeat mode with error handling
+                    const value = fn(t);
+                    if (isNaN(value) || !isFinite(value)) {
+                        output[i] = lastValidOutput;
+                    } else {
+                        output[i] = ((value & 255) - 128) / 128.0;
+                        lastValidOutput = output[i];
+                    }
                 } else {
-                    // Floatbeat mode
-                    output[i] = Math.max(-1, Math.min(1, fn(t))); // Clamp to [-1, 1]
+                    // Floatbeat mode with error handling
+                    const value = fn(t);
+                    if (isNaN(value) || !isFinite(value)) {
+                        output[i] = lastValidOutput;
+                    } else {
+                        output[i] = Math.max(-1, Math.min(1, value));
+                        lastValidOutput = output[i];
+                    }
                 }
             } catch (err) {
-                output[i] = 0; // Handle formula errors gracefully
+                output[i] = lastValidOutput; // Use last valid output instead of silence
             }
             sampleTime += sampleRateRatio;
         }
@@ -329,6 +353,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
             updateURL();
+            resumeAudioContext(); // Keep audio playing when tab is not visible
+        } else {
+            resumeAudioContext(); // Also resume when returning to tab
         }
     });
     
