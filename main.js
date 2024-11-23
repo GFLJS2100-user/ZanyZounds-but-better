@@ -96,7 +96,7 @@ function updateURL() {
     
     try {
         const newUrl = new URL(window.location.origin + window.location.pathname);
-        newUrl.searchParams.set('code', encodeURIComponent(code));
+        newUrl.searchParams.set('code', atob(code));
         newUrl.searchParams.set('mode', mode);
         newUrl.searchParams.set('sampleRate', sampleRate);
 
