@@ -22,7 +22,9 @@
         <option value="byte">Bytebeat</option>
         <option value="float">Floatbeat</option>
     </select>
-    <input type="range" id="volume-slider" min="0" max="100" value="50" class="volume-control">
+    <div class="volume-control">
+        <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="0.5">
+    </div>
     <button class="btn play-btn"><center>Listen to the code!</center></button>
     <button class="btn stop-btn"><center>Stop the code!</center></button>
 </div>
