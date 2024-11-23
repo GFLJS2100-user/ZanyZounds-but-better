@@ -295,7 +295,6 @@ function updatePresetButtons() {
         const button = document.createElement('div');
         button.className = 'frame';
         
-        // Create formatted content with author, date and sample rate
         button.innerHTML = `
             <div class="preset-info">
                 <div class="preset-name">${preset.name}</div>
@@ -303,16 +302,23 @@ function updatePresetButtons() {
                     <span>By: ${preset.author || 'Anonymous'}</span>
                     <span>Date: ${preset.date || 'Unknown'}</span>
                     <span>Sample Rate: ${preset.sampleRate || '44100'}Hz</span>
+                    <span>Mode: ${preset.mode || 'byte'}</span>
                 </div>
             </div>
         `;
         
         button.addEventListener('click', () => {
             editor.setValue(preset.code, -1);
+            
             // Update sample rate from preset
             const sampleRateInput = document.getElementById('sample-rate');
             sampleRateInput.value = preset.sampleRate || '44100';
             currentSampleRate = parseInt(preset.sampleRate || '44100');
+            
+            // Update mode from preset
+            const modeSelect = document.getElementById('mode-select');
+            modeSelect.value = preset.mode || 'byte';
+            currentMode = preset.mode || 'byte';
             
             if (isPlaying) {
                 stopAudio();
