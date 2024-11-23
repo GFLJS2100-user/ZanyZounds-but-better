@@ -96,7 +96,11 @@ function updateURL() {
     
     try {
         const newUrl = new URL(window.location.origin + window.location.pathname);
-        newUrl.searchParams.set('code', encodeURIComponent(code));
+        // Convert string to hex
+        const hexCode = Array.from(code)
+            .map(c => c.charCodeAt(0).toString(16).padStart(2, '0'))
+            .join('');
+        newUrl.searchParams.set('code', hexCode);
         newUrl.searchParams.set('mode', mode);
         newUrl.searchParams.set('sampleRate', sampleRate);
 
@@ -111,10 +115,13 @@ function loadFromURL() {
     
     if (params.has('code')) {
         try {
-            // Use decodeURIComponent directly
-            const code = decodeURIComponent(params.get('code'));
+            const hexCode = params.get('code');
+            // Convert hex back to string
+            const code = hexCode.match(/.{1,2}/g)
+                ?.map(hex => String.fromCharCode(parseInt(hex, 16)))
+                .join('') || '';
             editor.setValue(code, -1);
-            editor.clearSelection(); // Prevent selection after setting value
+            editor.clearSelection();
         } catch (e) {
             console.error('Error decoding code from URL:', e);
         }
