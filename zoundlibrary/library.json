@@ -17,14 +17,6 @@
       "sampleRate": 8000,
       "favorite": false,
       "created": "2024-11-21"
-    }, 
-    {
-      "name": "REV IT UP",
-      "author": "Chasyxx",
-      "code": "(((((((t/(4E4>t?(2E4>t?t%(t>>9)*10|t/2&t:t*(t>>9)*10&t/2)|t%(t>>9)*3&t/16:t*(t>>9)^t))*(t>>4))-33)%256)+256)%256)+2)*8192",
-      "mode": "bytebeat",
-      "sampleRate": 65536,
-      "favorite": false
     }
   ]
 }
