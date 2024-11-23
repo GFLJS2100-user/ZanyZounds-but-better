@@ -227,7 +227,7 @@ function startAudio(formula) {
         const t_start = Math.floor(sampleTime);
         
         // Process in chunks for better performance
-        const chunkSize = 128;
+        const chunkSize = 2;
         for (let i = 0; i < output.length; i += chunkSize) {
             const end = Math.min(i + chunkSize, output.length);
             
