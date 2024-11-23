@@ -8,6 +8,8 @@ let analyser;
 let editor;
 let presets = {};
 let currentMode = 'byte';
+let gainNode;
+let currentVolume = 0.5; // Default volume (50%)
 
 // Add Math functions to global scope
 for (let name of Object.getOwnPropertyNames(Math)) {
@@ -18,7 +20,10 @@ function initAudio() {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     processor = audioCtx.createScriptProcessor(4096, 1, 1);
     analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 4096;
+    gainNode = audioCtx.createGain();
+    gainNode.gain.value = currentVolume;
+    analyser.fftSize = 2048; // Adjusted for better performance
+    analyser.smoothingTimeConstant = 0.85; // Add smooth transitions
 }
 
 function drawWaveform() {
@@ -27,26 +32,49 @@ function drawWaveform() {
     const canvas = document.getElementById('waveform');
     const canvasCtx = canvas.getContext('2d');
     
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
+    // Set canvas resolution to match display size
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    
+    // Scale context to match resolution
+    canvasCtx.scale(dpr, dpr);
+    canvasCtx.clearRect(0, 0, rect.width, rect.height);
     
     const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
+    const dataArray = new Float32Array(bufferLength);
     
-    analyser.getByteTimeDomainData(dataArray);
+    // Use getFloatTimeDomainData for better precision
+    analyser.getFloatTimeDomainData(dataArray);
     
+    // Draw background
     canvasCtx.fillStyle = '#264653';
-    canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
-    canvasCtx.lineWidth = 1.5;
-    canvasCtx.strokeStyle = '#2a9d8f';
-    canvasCtx.beginPath();
+    canvasCtx.fillRect(0, 0, rect.width, rect.height);
     
-    const sliceWidth = canvas.width / bufferLength;
+    // Draw center line
+    canvasCtx.beginPath();
+    canvasCtx.strokeStyle = '#2a9d8f33';
+    canvasCtx.lineWidth = 1;
+    canvasCtx.moveTo(0, rect.height / 2);
+    canvasCtx.lineTo(rect.width, rect.height / 2);
+    canvasCtx.stroke();
+    
+    // Draw waveform
+    canvasCtx.beginPath();
+    canvasCtx.strokeStyle = '#2a9d8f';
+    canvasCtx.lineWidth = 2;
+    canvasCtx.lineCap = 'round';
+    canvasCtx.lineJoin = 'round';
+    
+    const sliceWidth = rect.width / bufferLength;
     let x = 0;
     
     for (let i = 0; i < bufferLength; i++) {
-        const v = 1 - dataArray[i] / 128.0;
-        const y = (v+1) * canvas.height/2;
+        const v = dataArray[i];
+        // Invert the y calculation here by negating the first term
+        const y = (-v * rect.height / 2) + rect.height / 2;
         
         if (i === 0) {
             canvasCtx.moveTo(x, y);
@@ -57,8 +85,21 @@ function drawWaveform() {
         x += sliceWidth;
     }
     
-    canvasCtx.lineTo(canvas.width, canvas.height/2);
+    // Add subtle glow effect
+    canvasCtx.shadowBlur = 5;
+    canvasCtx.shadowColor = '#2a9d8f';
     canvasCtx.stroke();
+    
+    // Reset shadow for next frame
+    canvasCtx.shadowBlur = 0;
+    
+    // Add gradient overlay
+    const gradient = canvasCtx.createLinearGradient(0, 0, 0, rect.height);
+    gradient.addColorStop(0, 'rgba(42, 157, 143, 0.2)');
+    gradient.addColorStop(1, 'rgba(42, 157, 143, 0)');
+    canvasCtx.fillStyle = gradient;
+    canvasCtx.fill();
+    
     requestAnimationFrame(drawWaveform);
 }
 
@@ -185,15 +226,16 @@ function startAudio(formula) {
             if (currentMode === 'byte') {
                 output[i] = (bytebeat(t, formula) - 128) / 128.0;
             } else {
-                // Direct floating point output for floatbeat mode
                 output[i] = floatbeat(t, formula);
             }
             sampleTime += sampleRateRatio;
         }
     };
 
+    // Update the audio routing to include gain node
     processor.connect(analyser);
-    analyser.connect(audioCtx.destination);
+    analyser.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
     isPlaying = true;
     drawWaveform();
     updateCounters();
@@ -303,6 +345,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const stopButton = document.querySelector('.stop-btn');
     const sampleRateInput = document.getElementById('sample-rate');
     const modeSelect = document.getElementById('mode-select');
+    const volumeSlider = document.getElementById('volume-slider');
     
     playButton.addEventListener('click', () => {
         const code = editor.getValue();
@@ -315,6 +358,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     stopButton.addEventListener('click', stopAudio);
+    
+    // Add volume control event listener
+    volumeSlider.addEventListener('input', (e) => {
+        currentVolume = e.target.value / 100;
+        if (gainNode) {
+            gainNode.gain.value = currentVolume;
+        }
+    });
     
     // Add debounce function
     function debounce(func, delay) {
