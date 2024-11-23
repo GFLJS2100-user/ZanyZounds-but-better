@@ -478,7 +478,7 @@ document.addEventListener('DOMContentLoaded', () => {
   editor.setFontSize(16);
 
   // Set default code if no code in URL
-  const defaultCode = 't%(t^t>>8)^t>>8|t>>6';
+  const defaultCode = 't%(t^t>>8)^t>>8^t|t>>11|t>>14';
 
   // Load initial state from URL
   const urlParams = new URLSearchParams(window.location.search);
