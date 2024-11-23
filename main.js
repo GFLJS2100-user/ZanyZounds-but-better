@@ -18,11 +18,11 @@ for (let name of Object.getOwnPropertyNames(Math)) {
 
 function initAudio() {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    processor = audioCtx.createScriptProcessor(1024, 1, 1);
+    processor = audioCtx.createScriptProcessor(8192, 1, 1);
     analyser = audioCtx.createAnalyser();
     gainNode = audioCtx.createGain();
     gainNode.gain.value = currentVolume;
-    analyser.fftSize = 4096;
+    analyser.fftSize = 8192;
 }
 
 function resumeAudioContext() {
