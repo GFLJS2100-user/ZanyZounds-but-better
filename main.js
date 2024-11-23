@@ -8,6 +8,8 @@ let analyser;
 let editor;
 let presets = {};
 let currentMode = 'byte';
+let gainNode;
+let currentVolume = 0.5;
 
 // Add Math functions to global scope
 for (let name of Object.getOwnPropertyNames(Math)) {
@@ -16,8 +18,10 @@ for (let name of Object.getOwnPropertyNames(Math)) {
 
 function initAudio() {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    processor = audioCtx.createScriptProcessor(1024, 1, 1); // Changed buffer size to 1024
+    processor = audioCtx.createScriptProcessor(1024, 1, 1);
     analyser = audioCtx.createAnalyser();
+    gainNode = audioCtx.createGain();
+    gainNode.gain.value = currentVolume;
     analyser.fftSize = 4096;
 }
 
@@ -104,16 +108,17 @@ function updateURL() {
     const code = editor.getValue();
     const mode = document.getElementById('mode-select').value;
     const sampleRate = document.getElementById('sample-rate').value;
+    const volume = document.getElementById('volume-slider').value;
     
     try {
         const newUrl = new URL(window.location.origin + window.location.pathname);
-        // Convert string to hex
         const hexCode = Array.from(code)
             .map(c => c.charCodeAt(0).toString(16).padStart(2, '0'))
             .join('');
         newUrl.searchParams.set('code', hexCode);
         newUrl.searchParams.set('mode', mode);
         newUrl.searchParams.set('sampleRate', sampleRate);
+        newUrl.searchParams.set('volume', volume);
 
         window.history.replaceState({}, '', newUrl);
     } catch (e) {
@@ -127,7 +132,6 @@ function loadFromURL() {
     if (params.has('code')) {
         try {
             const hexCode = params.get('code');
-            // Convert hex back to string
             const code = hexCode.match(/.{1,2}/g)
                 ?.map(hex => String.fromCharCode(parseInt(hex, 16)))
                 .join('') || '';
@@ -148,6 +152,15 @@ function loadFromURL() {
         const sampleRate = params.get('sampleRate');
         document.getElementById('sample-rate').value = sampleRate;
         currentSampleRate = parseInt(sampleRate);
+    }
+
+    if (params.has('volume')) {
+        const volume = params.get('volume');
+        document.getElementById('volume-slider').value = volume;
+        currentVolume = parseFloat(volume);
+        if (gainNode) {
+            gainNode.gain.value = currentVolume;
+        }
     }
 }
 
@@ -204,10 +217,8 @@ function startAudio(formula) {
             const t = Math.floor(sampleTime);
             try {
                 if (currentMode === 'byte') {
-                    // Bytebeat mode
                     output[i] = ((fn(t) & 255) - 128) / 128.0;
                 } else {
-                    // Floatbeat mode
                     output[i] = Math.max(-1, Math.min(1, fn(t))); // Clamp to [-1, 1]
                 }
             } catch (err) {
@@ -217,7 +228,8 @@ function startAudio(formula) {
         }
     };
 
-    processor.connect(analyser);
+    processor.connect(gainNode);
+    gainNode.connect(analyser);
     analyser.connect(audioCtx.destination);
     isPlaying = true;
     drawWaveform();
@@ -376,6 +388,16 @@ document.addEventListener('DOMContentLoaded', () => {
             startAudio(editor.getValue());
         }
     }, 1));
+
+    const volumeSlider = document.getElementById('volume-slider');
+    volumeSlider.value = currentVolume;
+
+    volumeSlider.addEventListener('input', () => {
+        currentVolume = parseFloat(volumeSlider.value);
+        if (gainNode) {
+            gainNode.gain.value = currentVolume;
+        }
+    });
 
     loadPresets();
 });
