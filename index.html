@@ -5,59 +5,30 @@
 <title>ZanyZounds</title>
 <link rel="stylesheet" type="text/css" href="theme.css">
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.23.0/ace.js"></script>
 <script src="main.js"></script>
 
 <body>
-<div id="libraryModal" class="modal">
-  <div class="modal-content">
-    <span class="close">&times;</span>
-    <h2>Zound Library</h2>
-    <div id="libraryItems"></div>
-  </div>
-</div>
-<div id="favoritesModal" class="modal">
-  <div class="modal-content">
-    <span class="close-favorites">&times;</span>
-    <h2>Favorite Zounds</h2>
-    <div id="favoritesItems"></div>
-  </div>
-</div>
-<div class="controls">
-  <div id="editor"></div>
-  <div class="input-row">
-    <select id="mode">
-      <option value="bytebeat">ByteBeat</option>
-      <option value="floatbeat">FloatBeat</option>
-      <option value="bitbeat">BitBeat</option>
-      <option value="logmode">LogMode</option>
-      <option value="sinmode">SinMode</option>
-      <option value="sinfmode">SinFMode</option>
-    </select>
-    <input type="number" id="sampleRate" value="44100" placeholder="Sample Rate (Hz)">
-  </div>
-  <div class="input-row">
-    <label for="volume">Volume:</label>
-    <input type="range" id="volume" min="0" max="100" value="50">
-    <span id="volumeValue">50%</span>
-  </div>
-</div>
-<div id="errorMessage" class="error-message"></div>
-<div id="counter">Time: 0 samples (0.00 seconds) | Size: 0 B | 0.00 KB | 0.000 MB | 0.0000 GB | 0.00000 TB</div>
-<div class="button-container">
-  <button class="btn">Listen to the code!</button>
-  <button class="btn btn-stop">Stop the code!</button>
-  <button class="btn btn-library">Open Library</button>
-  <button class="btn btn-favorites">Favorites ⭐</button>
-</div>
+<div id="editor">t%(t^t>>8)*(t>>8)|t>>6|t>>8</div>
 <canvas id="waveform"></canvas>
-<br>
-<a href="https://github.com/GFLJS2100-user/ZanyZounds-but-better/" class="github-link">
-  <svg viewBox="0 0 16 16">
-    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
-  </svg>
-  View on GitHub
-</a>
+<div id="counter-display" class="counter-display">
+    Time: 0.00s<br>
+    Samples: 0<br>
+    Code Size: 0 Bytes
+</div>
+<div class="settings">
+    <input type="number" id="sample-rate" value="44100" placeholder="Sample Rate (Hz)">
+    <select id="mode-select">
+        <option value="byte">Bytebeat</option>
+        <option value="float">Floatbeat</option>
+    </select>
+    <button class="btn play-btn"><center>Listen to the code!</center></button>
+    <button class="btn stop-btn"><center>Stop the code!</center></button>
+</div>
+
+<details>
+    <summary>Library</summary>
+    <div id="scrolling-frame"></div>
+</details>
 </body>
 </html>
