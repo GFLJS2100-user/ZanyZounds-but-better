@@ -108,17 +108,16 @@ function updateURL() {
     const code = editor.getValue();
     const mode = document.getElementById('mode-select').value;
     const sampleRate = document.getElementById('sample-rate').value;
-    const volume = document.getElementById('volume-slider').value;
     
     try {
         const newUrl = new URL(window.location.origin + window.location.pathname);
+        // Convert string to hex
         const hexCode = Array.from(code)
             .map(c => c.charCodeAt(0).toString(16).padStart(2, '0'))
             .join('');
         newUrl.searchParams.set('code', hexCode);
         newUrl.searchParams.set('mode', mode);
         newUrl.searchParams.set('sampleRate', sampleRate);
-        newUrl.searchParams.set('volume', volume);
 
         window.history.replaceState({}, '', newUrl);
     } catch (e) {
@@ -132,6 +131,7 @@ function loadFromURL() {
     if (params.has('code')) {
         try {
             const hexCode = params.get('code');
+            // Convert hex back to string
             const code = hexCode.match(/.{1,2}/g)
                 ?.map(hex => String.fromCharCode(parseInt(hex, 16)))
                 .join('') || '';
@@ -152,15 +152,6 @@ function loadFromURL() {
         const sampleRate = params.get('sampleRate');
         document.getElementById('sample-rate').value = sampleRate;
         currentSampleRate = parseInt(sampleRate);
-    }
-
-    if (params.has('volume')) {
-        const volume = params.get('volume');
-        document.getElementById('volume-slider').value = volume;
-        currentVolume = parseFloat(volume);
-        if (gainNode) {
-            gainNode.gain.value = currentVolume;
-        }
     }
 }
 
@@ -217,8 +208,10 @@ function startAudio(formula) {
             const t = Math.floor(sampleTime);
             try {
                 if (currentMode === 'byte') {
+                    // Bytebeat mode
                     output[i] = ((fn(t) & 255) - 128) / 128.0;
                 } else {
+                    // Floatbeat mode
                     output[i] = Math.max(-1, Math.min(1, fn(t))); // Clamp to [-1, 1]
                 }
             } catch (err) {
@@ -228,9 +221,9 @@ function startAudio(formula) {
         }
     };
 
-    processor.connect(gainNode);
-    gainNode.connect(analyser);
-    analyser.connect(audioCtx.destination);
+    processor.connect(analyser);
+    analyser.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
     isPlaying = true;
     drawWaveform();
     updateCounters();
@@ -239,6 +232,9 @@ function startAudio(formula) {
 function stopAudio() {
     if (processor) {
         processor.disconnect();
+        if (gainNode) {
+            gainNode.disconnect();
+        }
         isPlaying = false;
     }
 }
@@ -390,14 +386,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 1));
 
     const volumeSlider = document.getElementById('volume-slider');
-    volumeSlider.value = currentVolume;
-
-    volumeSlider.addEventListener('input', () => {
-        currentVolume = parseFloat(volumeSlider.value);
+    
+    volumeSlider.addEventListener('input', (e) => {
+        currentVolume = parseFloat(e.target.value);
         if (gainNode) {
             gainNode.gain.value = currentVolume;
         }
     });
-
+    
     loadPresets();
 });
