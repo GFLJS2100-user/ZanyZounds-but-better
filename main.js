@@ -213,15 +213,33 @@ function updatePresetButtons() {
     const scrollingFrame = document.getElementById('scrolling-frame');
     scrollingFrame.innerHTML = '';
     for (const preset of presets) {
-        const button = document.createElement('button');
+        const button = document.createElement('div');
         button.className = 'frame';
-        button.textContent = preset.name;
+        
+        // Create formatted content with author, date and sample rate
+        button.innerHTML = `
+            <div class="preset-info">
+                <div class="preset-name">${preset.name}</div>
+                <div class="preset-details">
+                    <span>By: ${preset.author || 'Anonymous'}</span>
+                    <span>Date: ${preset.date || 'Unknown'}</span>
+                    <span>Sample Rate: ${preset.sampleRate || '44100'}Hz</span>
+                </div>
+            </div>
+        `;
+        
         button.addEventListener('click', () => {
             editor.setValue(preset.code, -1);
+            // Update sample rate from preset
+            const sampleRateInput = document.getElementById('sample-rate');
+            sampleRateInput.value = preset.sampleRate || '44100';
+            currentSampleRate = parseInt(preset.sampleRate || '44100');
+            
             if (isPlaying) {
                 stopAudio();
             }
             startAudio(preset.code);
+            updateURL(); // Update URL with new values
         });
         scrollingFrame.appendChild(button);
     }
