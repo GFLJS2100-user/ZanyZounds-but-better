@@ -1,609 +1,331 @@
-let audioContext;
-let analyser;
+let audioCtx;
+let processor;
 let isPlaying = false;
-let currentNode = null;
-let oscillator = null;
+let currentSampleRate = 44100;
+let timeScaling = 1;
+let sampleTime = 0;
+let analyser;
 let editor;
-let startTime;
+let presets = {};
+let currentMode = 'byte';
 
-let library = {
-  items: []
-};
-
-let gainNode;
-let currentVolume = 0.5; // Default volume (50%)
-
-// Cookie handling functions
-function setCookie(name, value, days) {
-  const d = new Date();
-  d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
-  const expires = "expires=" + d.toUTCString();
-  document.cookie = name + "=" + value + ";" + expires + ";path=/";
-}
-
-function getCookie(name) {
-  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-  if (match) return JSON.parse(decodeURIComponent(match[2]));
-  return [];
-}
-
-// Favorites handling
-let favorites = getCookie('zanyZoundsFavorites') || [];
-
-function saveFavorites() {
-  setCookie('zanyZoundsFavorites', JSON.stringify(favorites), 365); // Save for 1 year
-}
-
-function toggleFavorite(index) {
-  const item = library.items[index];
-  const favIndex = favorites.findIndex(f => f.name === item.name);
-  
-  if (favIndex === -1) {
-    // Create a clean copy of the item to store in favorites
-    const favoriteItem = {
-      name: item.name,
-      author: item.author,
-      code: item.code,
-      mode: item.mode,
-      sampleRate: item.sampleRate,
-      favorite: true
-    };
-    favorites.push(favoriteItem);
-    item.favorite = true;
-  } else {
-    favorites.splice(favIndex, 1);
-    item.favorite = false;
-  }
-  
-  saveFavorites();
-  renderLibrary();
-  renderFavorites();
-}
-
-function openFavorites() {
-  document.getElementById('favoritesModal').style.display = 'block';
-  renderFavorites();
-}
-
-function closeFavorites() {
-  document.getElementById('favoritesModal').style.display = 'none';
-}
-
-function renderFavorites() {
-  const container = document.getElementById('favoritesItems');
-  container.innerHTML = '';
-  
-  favorites.forEach((item) => {
-    const div = document.createElement('div');
-    div.className = 'library-item';
-    div.innerHTML = `
-      <h3>${item.name}</h3>
-      <div class="library-item-info">
-        Author: ${item.author}<br>
-        Mode: ${item.mode}<br>
-        Sample Rate: ${item.sampleRate}Hz
-      </div>
-      <div class="library-item-actions">
-        <button class="btn" onclick='loadPreset(${JSON.stringify(item)})'>Load</button>
-        <span class="favorite-btn active" onclick="toggleFavorite(${library.items.findIndex(i => i.name === item.name)})">⭐</span>
-      </div>
-    `;
-    container.appendChild(div);
-  });
-  
-  if (favorites.length === 0) {
-    container.innerHTML = '<p>No favorites yet! Add some from the library.</p>';
-  }
-}
-
-function loadLibrary() {
-  fetch('./zoundlibrary/library.json')
-    .then(response => {
-      if (!response.ok) throw new Error('Failed to load library');
-      return response.json();
-    })
-    .then(data => {
-      library = data;
-      // Restore favorite status from cookies
-      favorites = getCookie('zanyZoundsFavorites') || [];
-      library.items.forEach(item => {
-        item.favorite = favorites.some(f => f.name === item.name);
-      });
-      renderLibrary();
-    })
-    .catch(err => {
-      console.error('Error loading library:', err);
-      library = { items: [] };
-    });
-
-}
-
-function openLibrary() {
-  document.getElementById('libraryModal').style.display = 'block';
-  renderLibrary();
-}
-
-function closeLibrary() {
-  document.getElementById('libraryModal').style.display = 'none';
-}
-
-function loadPreset(item) {
-  // Ensure we're working with an object, not a string representation
-  let preset;
-  if (typeof item === 'string') {
-    try {
-      preset = JSON.parse(item);
-    } catch (e) {
-      console.error('Error parsing preset:', e);
-      return;
-    }
-  } else {
-    preset = item;
-  }
-  
-  // Validate the preset has required properties
-  if (!preset || !preset.code) {
-    console.error('Invalid preset:', preset);
-    return;
-  }
-  
-  // Set the editor value
-  editor.setValue(preset.code || '', -1);
-  
-  // Set mode and sample rate if they exist
-  if (preset.mode) {
-    document.getElementById('mode').value = preset.mode;
-  }
-  
-  if (preset.sampleRate) {
-    document.getElementById('sampleRate').value = preset.sampleRate;
-  }
-
-  // Close modals
-  closeFavorites();
-  closeLibrary();
-
-  // Update URL and sound if playing
-  saveState();
-  if (isPlaying) {
-    updateSound();
-  }
-}
-
-function renderLibrary() {
-  const container = document.getElementById('libraryItems');
-  container.innerHTML = '';
-
-  const sortedItems = [...library.items].sort((a, b) => {
-    if (a.favorite && !b.favorite) return -1;
-    if (!a.favorite && b.favorite) return 1;
-    return new Date(b.created) - new Date(a.created);
-  });
-
-  sortedItems.forEach((item, index) => {
-    const div = document.createElement('div');
-    div.className = 'library-item';
-    div.innerHTML = `
-      <h3>${item.name}</h3>
-      <div class="library-item-info">
-        Author: ${item.author}<br>
-        Mode: ${item.mode}<br>
-        Sample Rate: ${item.sampleRate}Hz
-      </div>
-      <div class="library-item-actions">
-        <button class="btn" onclick="loadPreset(library.items[${index}])">Load</button>
-        <span class="favorite-btn ${item.favorite ? 'active' : ''}" 
-              onclick="toggleFavorite(${index})">⭐</span>
-      </div>
-    `;
-    container.appendChild(div);
-  });
-}
-
-function updateCounter(t, sampleRate) {
-  const counterElement = document.getElementById('counter');
-  const seconds = t / sampleRate;
-  
-  // Get current code size in bytes
-  const code = editor.getValue();
-  const bytes = new Blob([code]).size;
-  const kb = bytes / 1024;
-  const mb = kb / 1024;
-  const gb = mb / 1024;
-  const tb = gb / 1024;
-  
-  const sizeText = `Size: ${bytes.toFixed(0)} B | ${kb.toFixed(2)} KB | ${mb.toFixed(3)} MB | ${gb.toFixed(4)} GB | ${tb.toFixed(5)} TB`;
-  counterElement.textContent = `Time: ${t.toLocaleString()} samples (${seconds.toFixed(2)} seconds) | ${sizeText}`;
+// Add Math functions to global scope
+for (let name of Object.getOwnPropertyNames(Math)) {
+    globalThis[name] = Math[name];
 }
 
 function initAudio() {
-  audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  analyser = audioContext.createAnalyser();
-  gainNode = audioContext.createGain();
-  gainNode.gain.value = currentVolume;
-  analyser.fftSize = 1024; // Changed from 2048 to 1024
-}
-
-function showError(message) {
-  const errorDiv = document.getElementById('errorMessage');
-  errorDiv.textContent = `Error: ${message}`;
-  errorDiv.style.display = 'block';
-  setTimeout(() => {
-    errorDiv.style.display = 'none';
-  }, 5000); // Hide after 5 seconds
-}
-
-function bytebeat(t, formula) {
-  try {
-    const result = eval(formula);
-    return Number.isNaN(result) ? 128 : result % 256;
-  } catch (e) {
-    console.error("Formula error:", e);
-    return 128;
-  }
-}
-
-function floatbeat(t, formula) {
-  try {
-    const result = eval(formula);
-    return Number.isNaN(result) ? 0 : Math.max(-1, Math.min(1, result));
-  } catch (e) {
-    console.error("Formula error:", e);
-    return 0;
-  }
-}
-
-function bitbeat(t, formula) {
-  try {
-    const result = eval(formula);
-    return Number.isNaN(result) ? 128 : (result & 1) ? 192 : 64;
-  } catch (e) {
-    console.error("Formula error:", e);
-    return 128;
-  }
-}
-
-function logMode(t, formula) {
-  try {
-    const result = eval(formula);
-    return Number.isNaN(result) ? 128 : Math.log2(Math.abs(result) + 1) * 32 % 256;
-  } catch (e) {
-    console.error("Formula error:", e);
-    return 128;
-  }
-}
-
-function sinMode(t, formula) {
-  try {
-    const result = eval(formula);
-    return Number.isNaN(result) ? 128 : Math.sin(result) * 127 + 128;
-  } catch (e) {
-    console.error("Formula error:", e);
-    return 128;
-  }
-}
-
-function sinFMode(t, formula) {
-  try {
-    const result = eval(formula);
-    return Number.isNaN(result) ? 0 : Math.sin(result * Math.PI / 128);
-  } catch (e) {
-    console.error("Formula error:", e);
-    return 0;
-  }
-}
-
-function playByteBeat(code, sampleRate, mode) {
-  // Add Math functions to global scope
-  for (let name of Object.getOwnPropertyNames(Math)) {
-    globalThis[name] = Math[name];
-  }
-
-  if (currentNode) {
-    currentNode.disconnect();
-  }
-
-  const bufferSize = 4096;
-  const node = audioContext.createScriptProcessor(bufferSize, 1, 2);
-  
-  let t = 0;
-  startTime = Date.now();
-  const timeScale = sampleRate / audioContext.sampleRate;
-
-  node.onaudioprocess = function(e) {
-    const leftOutput = e.outputBuffer.getChannelData(0);
-    const rightOutput = e.outputBuffer.getChannelData(1);
-    
-    for (let i = 0; i < bufferSize; i++) {
-      try {
-        const scaledT = Math.floor(t);
-        let value;
-
-        if (code.includes('[') && code.includes(']')) {
-          // Handle stereo code
-          const stereoCode = code.trim();
-          if (stereoCode.startsWith('[') && stereoCode.endsWith(']')) {
-            const channels = stereoCode.slice(1, -1).split(',');
-            if (channels.length === 2) {
-              switch(mode) {
-                case 'bytebeat':
-                  leftOutput[i] = (bytebeat(scaledT, channels[0].trim()) - 128) / 128.0;
-                  rightOutput[i] = (bytebeat(scaledT, channels[1].trim()) - 128) / 128.0;
-                  break;
-                case 'floatbeat':
-                  leftOutput[i] = floatbeat(scaledT, channels[0].trim());
-                  rightOutput[i] = floatbeat(scaledT, channels[1].trim());
-                  break;
-                case 'bitbeat':
-                  leftOutput[i] = (bitbeat(scaledT, channels[0].trim()) - 128) / 128.0;
-                  rightOutput[i] = (bitbeat(scaledT, channels[1].trim()) - 128) / 128.0;
-                  break;
-                case 'logmode':
-                  leftOutput[i] = (logMode(scaledT, channels[0].trim()) - 128) / 128.0;
-                  rightOutput[i] = (logMode(scaledT, channels[1].trim()) - 128) / 128.0;
-                  break;
-                case 'sinmode':
-                  leftOutput[i] = (sinMode(scaledT, channels[0].trim()) - 128) / 128.0;
-                  rightOutput[i] = (sinMode(scaledT, channels[1].trim()) - 128) / 128.0;
-                  break;
-                case 'sinfmode':
-                  leftOutput[i] = sinFMode(scaledT, channels[0].trim());
-                  rightOutput[i] = sinFMode(scaledT, channels[1].trim());
-                  break;
-              }
-            }
-          }
-        } else {
-          // Handle mono code
-          switch(mode) {
-            case 'bytebeat':
-              value = (bytebeat(scaledT, code) - 128) / 128.0;
-              break;
-            case 'floatbeat':
-              value = floatbeat(scaledT, code);
-              break;
-            case 'bitbeat':
-              value = (bitbeat(scaledT, code) - 128) / 128.0;
-              break;
-            case 'logmode':
-              value = (logMode(scaledT, code) - 128) / 128.0;
-              break;
-            case 'sinmode':
-              value = (sinMode(scaledT, code) - 128) / 128.0;
-              break;
-            case 'sinfmode':
-              value = sinFMode(scaledT, code);
-              break;
-            default:
-              value = 0;
-          }
-          leftOutput[i] = rightOutput[i] = value;
-        }
-
-        t += timeScale;
-        
-        if (i === 0) {
-          updateCounter(Math.floor(t), sampleRate);
-        }
-      } catch (err) {
-        console.error('Error in audio processing:', err);
-        leftOutput[i] = rightOutput[i] = 0;
-        
-        if (i === 0) {
-          showError(err.message);
-        }
-      }
-    }
-  };
-
-  // Modify the connection chain
-  node.connect(analyser);
-  analyser.connect(gainNode);
-  gainNode.connect(audioContext.destination);
-  currentNode = node;
-  isPlaying = true;
-  drawWaveform();
-}
-
-function stopSound() {
-  if (currentNode) {
-    currentNode.disconnect();
-    currentNode = null;
-  }
-  if (gainNode) {
-    gainNode.disconnect();
-    gainNode = audioContext.createGain();
-    gainNode.gain.value = currentVolume;
-  }
-  isPlaying = false;
-
-  // Clear waveform
-  const canvas = document.getElementById('waveform');
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#333';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    processor = audioCtx.createScriptProcessor(4096, 1, 1);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 4096;
 }
 
 function drawWaveform() {
-  if (!isPlaying) return;
-  
-  const canvas = document.getElementById('waveform');
-  const ctx = canvas.getContext('2d');
-  
-  // Resize canvas to match its display size
-  canvas.width = canvas.offsetWidth;
-  canvas.height = canvas.offsetHeight;
-  
-  // Get frequency data
-  const bufferLength = analyser.frequencyBinCount;
-  const dataArray = new Uint8Array(bufferLength);
-  analyser.getByteTimeDomainData(dataArray);
-  
-  // Clear canvas
-  ctx.fillStyle = '#333';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  
-  // Draw waveform
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = '#61decd';
-  ctx.beginPath();
-  
-  const sliceWidth = canvas.width * 1.0 / bufferLength;
-  let x = 0;
-  
-  for (let i = 0; i < bufferLength; i++) {
-    const v = 1 - dataArray[i] / 128.0;
-    const y = (v + 1) * canvas.height / 2;
+    if (!isPlaying) return;
     
-    if (i === 0) {
-      ctx.moveTo(x, y);
-    } else {
-      ctx.lineTo(x, y);
+    const canvas = document.getElementById('waveform');
+    const canvasCtx = canvas.getContext('2d');
+    
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    
+    analyser.getByteTimeDomainData(dataArray);
+    
+    canvasCtx.fillStyle = '#264653';
+    canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+    canvasCtx.lineWidth = 1.5;
+    canvasCtx.strokeStyle = '#2a9d8f';
+    canvasCtx.beginPath();
+    
+    const sliceWidth = canvas.width / bufferLength;
+    let x = 0;
+    
+    for (let i = 0; i < bufferLength; i++) {
+        const v = 1 - dataArray[i] / 128.0;
+        const y = (v+1) * canvas.height/2;
+        
+        if (i === 0) {
+            canvasCtx.moveTo(x, y);
+        } else {
+            canvasCtx.lineTo(x, y);
+        }
+        
+        x += sliceWidth;
     }
     
-    x += sliceWidth;
-  }
-  
-  ctx.lineTo(canvas.width, canvas.height / 2);
-  ctx.stroke();
-  
-  // Request next frame
-  requestAnimationFrame(drawWaveform);
+    canvasCtx.lineTo(canvas.width, canvas.height/2);
+    canvasCtx.stroke();
+    requestAnimationFrame(drawWaveform);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  editor = ace.edit("editor");
-  editor.setTheme("ace/theme/monokai");
-  editor.session.setMode("ace/mode/javascript");
-  editor.setFontSize(16);
-
-  // Set default code if no code in URL
-  const defaultCode = 't%(t^t>>8)^t>>8|t>>6';
-
-  // Load initial state from URL
-  const urlParams = new URLSearchParams(window.location.search);
-  
-  // Load code
-  if (urlParams.has('code')) {
-    const code = decodeURIComponent(urlParams.get('code'));
-    editor.setValue(code, -1);
-  } else {
-    editor.setValue(defaultCode, -1);
-  }
-
-  // Load mode
-  if (urlParams.has('mode')) {
-    document.getElementById('mode').value = urlParams.get('mode');
-  }
-
-  // Load sample rate
-  if (urlParams.has('sampleRate')) {
-    document.getElementById('sampleRate').value = urlParams.get('sampleRate');
-  }
-
-  // Add state saving functionality
-  let saveTimeout;
-  const saveState = () => {
-    const code = editor.getValue();
-    const mode = document.getElementById('mode').value;
-    const sampleRate = document.getElementById('sampleRate').value;
-
-    const newUrl = new URL(window.location.origin + window.location.pathname);
-    newUrl.searchParams.set('code', encodeURIComponent(code));
-    newUrl.searchParams.set('mode', mode);
-    newUrl.searchParams.set('sampleRate', sampleRate);
-
-    window.history.replaceState({}, '', newUrl);
-  };
-
-  // Add real-time sound update for code and mode changes
-  const updateSound = () => {
-    if (isPlaying && audioContext) {
-      const code = editor.getValue();
-      const mode = document.getElementById('mode').value;
-      const sampleRate = parseInt(document.getElementById('sampleRate').value);
-      playByteBeat(code, sampleRate, mode);
-    }
-  };
-
-  const debouncedSave = () => {
-    clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => {
-      saveState();
-      updateSound();
-    }, 1);
-  };
-
-  // Update on code changes
-  editor.session.on('change', debouncedSave);
-
-  // Update on mode changes
-  document.getElementById('mode').addEventListener('change', () => {
-    saveState();
-    updateSound();
-  });
-
-  // Update on sample rate changes (only when Enter is pressed)
-  document.getElementById('sampleRate').addEventListener('keyup', (e) => {
-    if (e.key === 'Enter') {
-      saveState();
-      updateSound();
-    }
-  });
-
-  // Add volume control
-  const volumeSlider = document.getElementById('volume');
-  const volumeValue = document.getElementById('volumeValue');
-  
-  volumeSlider.addEventListener('input', (e) => {
-    currentVolume = e.target.value / 100;
-    volumeValue.textContent = `${e.target.value}%`;
-    if (gainNode) {
-      gainNode.gain.value = currentVolume;
-    }
-  });
-
-  window.addEventListener('resize', () => {
-    editor.resize();
-  });
-
-  const playButton = document.querySelector('.btn');
-  const stopButton = document.querySelector('.btn-stop');
-
-  playButton.addEventListener('click', () => {
+function bytebeat(t, formula) {
     try {
-      if (!audioContext) {
-        initAudio();
-      }
-
-      const code = editor.getValue();
-      const mode = document.getElementById('mode').value;
-      const sampleRate = parseInt(document.getElementById('sampleRate').value);
-
-      if (!code) {
-        throw new Error('No code entered');
-      }
-      
-      if (isNaN(sampleRate) || sampleRate <= 0) {
-        throw new Error('Invalid sample rate');
-      }
-
-      playByteBeat(code, sampleRate, mode);
-    } catch (err) {
-      showError(err.message);
+        return eval(formula) % 256;
+    } catch (e) {
+        console.error("Formula error:", e);
+        return 0;
     }
-  });
+}
 
-  stopButton.addEventListener('click', () => {
-    stopSound();
-  });
+function floatbeat(t, formula) {
+    try {
+        // Ensure the output is clamped between -1 and 1 for proper audio
+        const result = eval(formula);
+        return Math.max(-1, Math.min(1, result)); // Clamp values
+    } catch (e) {
+        console.error("Formula error:", e);
+        return 0;
+    }
+}
 
-  document.querySelector('.btn-library').addEventListener('click', openLibrary);
-  document.querySelector('.close').addEventListener('click', closeLibrary);
-  document.querySelector('.btn-favorites').addEventListener('click', openFavorites);
-  document.querySelector('.close-favorites').addEventListener('click', closeFavorites);
+function formatBytes(bytes) {
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    if (bytes === 0) return '0 Bytes';
+    const i = Math.floor(Math.log(bytes) / Math.log(1e4));
+    return parseFloat((bytes / Math.pow(1024, i)).toFixed(2)) + ' ' + sizes[i];
+}
 
-  // Load library on startup
-  loadLibrary();
+function updateURL() {
+    const code = editor.getValue();
+    const mode = document.getElementById('mode-select').value;
+    const sampleRate = document.getElementById('sample-rate').value;
+    
+    try {
+        const newUrl = new URL(window.location.origin + window.location.pathname);
+        newUrl.searchParams.set('code', encodeURIComponent(code));
+        newUrl.searchParams.set('mode', mode);
+        newUrl.searchParams.set('sampleRate', sampleRate);
+
+        window.history.replaceState({}, '', newUrl);
+    } catch (e) {
+        console.error('Error updating URL parameters:', e);
+    }
+}
+
+function loadFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    
+    if (params.has('code')) {
+        try {
+            // Use decodeURIComponent directly
+            const code = decodeURIComponent(params.get('code'));
+            editor.setValue(code, -1);
+            editor.clearSelection(); // Prevent selection after setting value
+        } catch (e) {
+            console.error('Error decoding code from URL:', e);
+        }
+    }
+    
+    if (params.has('mode')) {
+        const mode = params.get('mode');
+        document.getElementById('mode-select').value = mode;
+        currentMode = mode;
+    }
+    
+    if (params.has('sampleRate')) {
+        const sampleRate = params.get('sampleRate');
+        document.getElementById('sample-rate').value = sampleRate;
+        currentSampleRate = parseInt(sampleRate);
+    }
+}
+
+function updateCounters() {
+    if (!isPlaying) return;
+    
+    const seconds = sampleTime / currentSampleRate;
+    const codeSize = new Blob([editor.getValue()]).size;
+    
+    document.getElementById('counter-display').innerHTML = `
+        Time: ${seconds.toFixed(2)}s<br>
+        Samples: ${Math.floor(sampleTime)}<br>
+        Code Size: ${formatBytes(codeSize)}
+    `;
+    
+    requestAnimationFrame(updateCounters);
+}
+
+function updateSampleRate() {
+    const newRate = parseInt(document.getElementById('sample-rate').value);
+    if (newRate && newRate > 0) {
+        currentSampleRate = newRate;
+        updateURL();
+        if (isPlaying) {
+            stopAudio();
+            startAudio(editor.getValue());
+        }
+    }
+}
+
+function startAudio(formula) {
+    if (!audioCtx) initAudio();
+    
+    if (isPlaying) {
+        processor.disconnect();
+    }
+
+    const sampleRateRatio = currentSampleRate / audioCtx.sampleRate;
+    sampleTime = 0;
+    currentMode = document.getElementById('mode-select').value;
+
+    processor.onaudioprocess = (e) => {
+        const output = e.outputBuffer.getChannelData(0);
+        for (let i = 0; i < output.length; i++) {
+            const t = Math.floor(sampleTime);
+            if (currentMode === 'byte') {
+                output[i] = (bytebeat(t, formula) - 128) / 128.0;
+            } else {
+                // Direct floating point output for floatbeat mode
+                output[i] = floatbeat(t, formula);
+            }
+            sampleTime += sampleRateRatio;
+        }
+    };
+
+    processor.connect(analyser);
+    analyser.connect(audioCtx.destination);
+    isPlaying = true;
+    drawWaveform();
+    updateCounters();
+}
+
+function stopAudio() {
+    if (processor) {
+        processor.disconnect();
+        isPlaying = false;
+    }
+}
+
+function loadPresets() {
+    fetch('zoundlibrary/library.json')
+        .then(response => response.json())
+        .then(data => {
+            presets = data.presets;
+            updatePresetButtons();
+        })
+        .catch(error => console.error('Error loading presets:', error));
+}
+
+function updatePresetButtons() {
+    const scrollingFrame = document.getElementById('scrolling-frame');
+    scrollingFrame.innerHTML = '';
+    for (const preset of presets) {
+        const button = document.createElement('button');
+        button.className = 'frame';
+        button.textContent = preset.name;
+        button.addEventListener('click', () => {
+            editor.setValue(preset.code, -1);
+            if (isPlaying) {
+                stopAudio();
+            }
+            startAudio(preset.code);
+        });
+        scrollingFrame.appendChild(button);
+    }
+}
+
+// Update the editor initialization and styling
+function updateEditor() {
+    editor = ace.edit("editor");
+    editor.setTheme("ace/theme/monokai");
+    editor.session.setMode("ace/mode/javascript");
+    editor.session.setTabSize(2);
+    editor.session.setUseSoftTabs(true);
+    editor.setShowPrintMargin(false);
+    editor.setOptions({
+        enableBasicAutocompletion: true,
+        enableLiveAutocompletion: true,
+        enableSnippets: true,
+        fontSize: "14px",
+        showLineNumbers: true,
+        showGutter: true,
+        highlightActiveLine: true,
+        wrap: true,
+        behavioursEnabled: true,
+        wrapBehavioursEnabled: true
+    });
+    
+    // Save current state immediately when editor loads
+    editor.session.on('changeScrollTop', function() {
+        updateURL();
+    });
+    
+    // Handle window unload
+    window.addEventListener('beforeunload', function() {
+        updateURL();
+    });
+}
+
+// Event Listeners
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize editor first
+    updateEditor();
+    
+    // Then load from URL
+    loadFromURL();
+    
+    // Save state when switching tabs or closing
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            updateURL();
+        }
+    });
+    
+    const playButton = document.querySelector('.play-btn');
+    const stopButton = document.querySelector('.stop-btn');
+    const sampleRateInput = document.getElementById('sample-rate');
+    const modeSelect = document.getElementById('mode-select');
+    
+    playButton.addEventListener('click', () => {
+        const code = editor.getValue();
+        if (code) {
+            if (isPlaying) {
+                stopAudio();
+            }
+            startAudio(code);
+        }
+    });
+
+    stopButton.addEventListener('click', stopAudio);
+    
+    // Add debounce function
+    function debounce(func, delay) {
+        let timeoutId;
+        return function() {
+            const context = this;
+            const args = arguments;
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => func.apply(context, args), delay);
+        };
+    }
+
+    // Apply debounced update to editor changes
+    const debouncedUpdate = debounce(() => {
+        updateURL();
+        if (isPlaying) {
+            stopAudio();
+            startAudio(editor.getValue());
+        }
+    }, 1); // Very short debounce time
+
+    editor.session.on('change', debouncedUpdate);
+
+    // Ensure other inputs also trigger quick updates
+    sampleRateInput.addEventListener('input', debounce(() => {
+        updateSampleRate();
+        updateURL();
+    }, 1));
+
+    modeSelect.addEventListener('change', debounce(() => {
+        updateURL();
+        if (isPlaying) {
+            stopAudio();
+            startAudio(editor.getValue());
+        }
+    }, 1));
+
+    loadPresets();
 });
-
