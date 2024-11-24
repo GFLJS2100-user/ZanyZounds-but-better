@@ -338,36 +338,13 @@ function stopAudio() {
 function loadPresets() {
     fetch('zoundlibrary/library.json')
         .then(response => response.json())
-        .then(async data => {
-            // For each preset that has a file reference, fetch the code
-            presets = await Promise.all(data.presets.map(async preset => {
-                if (preset.file) {
-                    try {
-                        // Check if it's a .js file
-                        if (preset.file.endsWith('.js')) {
-                            const response = await fetch(`zoundlibrary/${preset.file}`);
-                            if (!response.ok) throw new Error('File not found');
-                            const code = await response.text();
-                            return {
-                                ...preset,
-                                code: code
-                            };
-                        } else {
-                            return preset; // Return preset as-is for non-js files
-                        }
-                    } catch (error) {
-                        console.error(`Error loading file ${preset.file}:`, error);
-                        return preset; // Return preset without code if file fetch fails
-                    }
-                }
-                return preset; // Return preset as-is if it has inline code
-            }));
+        .then(data => {
+            presets = data.presets;
             updatePresetButtons();
         })
         .catch(error => console.error('Error loading presets:', error));
 }
 
-// Update the preset display to show file name if available
 function updatePresetButtons() {
     const scrollingFrame = document.getElementById('scrolling-frame');
     scrollingFrame.innerHTML = '';
@@ -375,11 +352,6 @@ function updatePresetButtons() {
         const button = document.createElement('div');
         button.className = 'frame';
         
-        // Add indication if code was loaded from file
-        const codeSource = preset.file ? 
-            `<span class="code-source">Source: ${preset.file}</span>` : 
-            '<span class="code-source">Inline code</span>';
-            
         button.innerHTML = `
             <div class="preset-info">
                 <div class="preset-name">${preset.name}</div>
@@ -388,15 +360,28 @@ function updatePresetButtons() {
                     <span>Date: ${preset.date || 'Unknown'}</span>
                     <span>Sample Rate: ${preset.sampleRate || '44100'}Hz</span>
                     <span>Mode: ${preset.mode || 'byte'}</span>
-                    ${preset.file ? `<span>File: ${preset.file}</span>` : ''}
+                    <span>Source: ${preset.file ? 'External File' : 'Inline Code'}</span>
                 </div>
-                ${codeSource}
             </div>
         `;
         
-        button.addEventListener('click', () => {
-            if (preset.code) {
-                editor.setValue(preset.code, -1);
+        button.addEventListener('click', async () => {
+            let code = preset.code;
+            
+            // If there's a file reference, fetch it
+            if (preset.file) {
+                try {
+                    const response = await fetch(`zoundlibrary/${preset.file}`);
+                    if (!response.ok) throw new Error('Failed to load file');
+                    code = await response.text();
+                } catch (error) {
+                    console.error('Error loading preset file:', error);
+                    return;
+                }
+            }
+            
+            if (code) {
+                editor.setValue(code, -1);
                 
                 // Update sample rate from preset
                 const sampleRateInput = document.getElementById('sample-rate');
@@ -411,10 +396,8 @@ function updatePresetButtons() {
                 if (isPlaying) {
                     stopAudio();
                 }
-                startAudio(preset.code);
-                updateURL();
-            } else {
-                console.error('No code available for preset:', preset.name);
+                startAudio(code);
+                updateURL(); // Update URL with new values
             }
         });
         scrollingFrame.appendChild(button);
