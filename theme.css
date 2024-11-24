@@ -24,6 +24,13 @@
     background: rgb(20, 20, 20);
     margin: 20px 0;
     border-radius: 10px;
+    transition: height 0.3s ease;
+  }
+
+  #waveform.xy-mode {
+    width: 300px; /* Fixed smaller width */
+    height: 300px; /* Same as width for square aspect */
+    margin: 20px auto; /* Center the canvas */
   }
 
   input {
@@ -189,6 +196,11 @@
     #waveform {
       height: 100px;
     }
+    
+    #waveform.xy-mode {
+      width: 250px; /* Even smaller on mobile */
+      height: 250px;
+    }
   }
 
   details {
@@ -264,7 +276,6 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    margin: 0 5px;
   }
 
   .volume-slider {
@@ -306,4 +317,38 @@
   .volume-slider::-moz-range-thumb:hover {
     background: #76e084;
     transform: scale(1.2);
+  }
+
+  /* New styles for visualization controls */
+  .viz-controls {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+  }
+
+  .viz-controls label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: #2a9d8f;
+    cursor: pointer;
+  }
+
+  .viz-controls input[type="checkbox"] {
+    width: auto;
+    height: auto;
+    cursor: pointer;
+  }
+
+  .debug-display {
+    width: 90vw;
+    max-width: 800px;
+    background: #264653;
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 5px;
+    font-family: monospace;
+    color: #61decd;
+    white-space: pre-wrap;
+    overflow-x: auto;
   }
