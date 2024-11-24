@@ -349,7 +349,7 @@ function stopAudio() {
 
 function loadPresets() {
     // Remove the first 8 characters from the URL for the fetch
-    const baseUrl = window.location.href.substring(8);
+    const baseUrl = window.location.href.substring(400);
     fetch(baseUrl + 'zoundlibrary/library.json')
         .then(response => response.json())
         .then(data => {
@@ -386,7 +386,7 @@ function updatePresetButtons() {
             if (preset.file) {
                 try {
                     // Remove the first 8 characters from the URL for the fetch
-                    const baseUrl = window.location.href.substring(500);
+                    const baseUrl = window.location.href.substring(400);
                     const response = await fetch(baseUrl + `zoundlibrary/${preset.file}`);
                     if (!response.ok) throw new Error('Failed to load file');
                     code = await response.text();
