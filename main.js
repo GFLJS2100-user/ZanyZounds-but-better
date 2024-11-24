@@ -343,12 +343,18 @@ function loadPresets() {
             presets = await Promise.all(data.presets.map(async preset => {
                 if (preset.file) {
                     try {
-                        const response = await fetch(`zoundlibrary/${preset.file}`);
-                        const code = await response.text();
-                        return {
-                            ...preset,
-                            code: code
-                        };
+                        // Check if it's a .js file
+                        if (preset.file.endsWith('.js')) {
+                            const response = await fetch(`zoundlibrary/${preset.file}`);
+                            if (!response.ok) throw new Error('File not found');
+                            const code = await response.text();
+                            return {
+                                ...preset,
+                                code: code
+                            };
+                        } else {
+                            return preset; // Return preset as-is for non-js files
+                        }
                     } catch (error) {
                         console.error(`Error loading file ${preset.file}:`, error);
                         return preset; // Return preset without code if file fetch fails
@@ -369,6 +375,11 @@ function updatePresetButtons() {
         const button = document.createElement('div');
         button.className = 'frame';
         
+        // Add indication if code was loaded from file
+        const codeSource = preset.file ? 
+            `<span class="code-source">Source: ${preset.file}</span>` : 
+            '<span class="code-source">Inline code</span>';
+            
         button.innerHTML = `
             <div class="preset-info">
                 <div class="preset-name">${preset.name}</div>
@@ -379,11 +390,11 @@ function updatePresetButtons() {
                     <span>Mode: ${preset.mode || 'byte'}</span>
                     ${preset.file ? `<span>File: ${preset.file}</span>` : ''}
                 </div>
+                ${codeSource}
             </div>
         `;
         
         button.addEventListener('click', () => {
-            // Use the code whether it came from file or inline
             if (preset.code) {
                 editor.setValue(preset.code, -1);
                 
