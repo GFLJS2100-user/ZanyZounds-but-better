@@ -28,7 +28,7 @@ function initAudio() {
     analyser = audioCtx.createAnalyser();
     gainNode = audioCtx.createGain();
     gainNode.gain.value = currentVolume;
-    analyser.fftSize = 16384;
+    analyser.fftSize = 8192;
 }
 
 function resumeAudioContext() {
