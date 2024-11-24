@@ -170,6 +170,23 @@ function formatBytes(bytes) {
     return parseFloat((bytes / Math.pow(1024, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
+function toHex(str) {
+    let result = '';
+    for (let i = 0; i < str.length; i++) {
+        result += str.charCodeAt(i).toString(16).padStart(4, '0');
+    }
+    return result;
+}
+
+function fromHex(hex) {
+    let str = '';
+    for (let i = 0; i < hex.length; i += 4) {
+        str += String.fromCharCode(parseInt(hex.substr(i, 4), 16));
+    }
+    return str;
+}
+
+// Replace the updateURL function
 function updateURL() {
     const code = editor.getValue();
     const mode = document.getElementById('mode-select').value;
@@ -177,11 +194,8 @@ function updateURL() {
     
     try {
         const newUrl = new URL(window.location.origin + window.location.pathname);
-        // Convert string to hex
-        const hexCode = Array.from(code)
-            .map(c => c.charCodeAt(0).toString(16).padStart(2, '0'))
-            .join('');
-        newUrl.searchParams.set('code', hexCode);
+        // Use hex encoding instead of encodeURIComponent
+        newUrl.searchParams.set('code', toHex(code));
         newUrl.searchParams.set('mode', mode);
         newUrl.searchParams.set('sampleRate', sampleRate);
 
@@ -191,16 +205,14 @@ function updateURL() {
     }
 }
 
+// Replace the loadFromURL function
 function loadFromURL() {
     const params = new URLSearchParams(window.location.search);
     
     if (params.has('code')) {
         try {
-            const hexCode = params.get('code');
-            // Convert hex back to string
-            const code = hexCode.match(/.{1,2}/g)
-                ?.map(hex => String.fromCharCode(parseInt(hex, 16)))
-                .join('') || '';
+            // Use hex decoding instead of decodeURIComponent
+            const code = fromHex(params.get('code'));
             editor.setValue(code, -1);
             editor.clearSelection();
         } catch (e) {
@@ -336,7 +348,9 @@ function stopAudio() {
 }
 
 function loadPresets() {
-    fetch('zoundlibrary/library.json')
+    // Remove the first 8 characters from the URL for the fetch
+    const baseUrl = window.location.href.substring(8);
+    fetch(baseUrl + 'zoundlibrary/library.json')
         .then(response => response.json())
         .then(data => {
             presets = data.presets;
@@ -371,7 +385,9 @@ function updatePresetButtons() {
             // If there's a file reference, fetch it
             if (preset.file) {
                 try {
-                    const response = await fetch(`zoundlibrary/${preset.file}`);
+                    // Remove the first 8 characters from the URL for the fetch
+                    const baseUrl = window.location.href.substring(8);
+                    const response = await fetch(baseUrl + `zoundlibrary/${preset.file}`);
                     if (!response.ok) throw new Error('Failed to load file');
                     code = await response.text();
                 } catch (error) {
