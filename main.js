@@ -24,11 +24,11 @@ let debugFrameCount = 0;
 
 function initAudio() {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    processor = audioCtx.createScriptProcessor(8192, 1, 1);
+    processor = audioCtx.createScriptProcessor(1024, 1, 1);
     analyser = audioCtx.createAnalyser();
     gainNode = audioCtx.createGain();
     gainNode.gain.value = currentVolume;
-    analyser.fftSize = 8192;
+    analyser.fftSize = 4096;
 }
 
 function resumeAudioContext() {
@@ -338,13 +338,30 @@ function stopAudio() {
 function loadPresets() {
     fetch('zoundlibrary/library.json')
         .then(response => response.json())
-        .then(data => {
-            presets = data.presets;
+        .then(async data => {
+            // For each preset that has a file reference, fetch the code
+            presets = await Promise.all(data.presets.map(async preset => {
+                if (preset.file) {
+                    try {
+                        const response = await fetch(`zoundlibrary/${preset.file}`);
+                        const code = await response.text();
+                        return {
+                            ...preset,
+                            code: code
+                        };
+                    } catch (error) {
+                        console.error(`Error loading file ${preset.file}:`, error);
+                        return preset; // Return preset without code if file fetch fails
+                    }
+                }
+                return preset; // Return preset as-is if it has inline code
+            }));
             updatePresetButtons();
         })
         .catch(error => console.error('Error loading presets:', error));
 }
 
+// Update the preset display to show file name if available
 function updatePresetButtons() {
     const scrollingFrame = document.getElementById('scrolling-frame');
     scrollingFrame.innerHTML = '';
@@ -360,28 +377,34 @@ function updatePresetButtons() {
                     <span>Date: ${preset.date || 'Unknown'}</span>
                     <span>Sample Rate: ${preset.sampleRate || '44100'}Hz</span>
                     <span>Mode: ${preset.mode || 'byte'}</span>
+                    ${preset.file ? `<span>File: ${preset.file}</span>` : ''}
                 </div>
             </div>
         `;
         
         button.addEventListener('click', () => {
-            editor.setValue(preset.code, -1);
-            
-            // Update sample rate from preset
-            const sampleRateInput = document.getElementById('sample-rate');
-            sampleRateInput.value = preset.sampleRate || '44100';
-            currentSampleRate = parseInt(preset.sampleRate || '44100');
-            
-            // Update mode from preset
-            const modeSelect = document.getElementById('mode-select');
-            modeSelect.value = preset.mode || 'byte';
-            currentMode = preset.mode || 'byte';
-            
-            if (isPlaying) {
-                stopAudio();
+            // Use the code whether it came from file or inline
+            if (preset.code) {
+                editor.setValue(preset.code, -1);
+                
+                // Update sample rate from preset
+                const sampleRateInput = document.getElementById('sample-rate');
+                sampleRateInput.value = preset.sampleRate || '44100';
+                currentSampleRate = parseInt(preset.sampleRate || '44100');
+                
+                // Update mode from preset
+                const modeSelect = document.getElementById('mode-select');
+                modeSelect.value = preset.mode || 'byte';
+                currentMode = preset.mode || 'byte';
+                
+                if (isPlaying) {
+                    stopAudio();
+                }
+                startAudio(preset.code);
+                updateURL();
+            } else {
+                console.error('No code available for preset:', preset.name);
             }
-            startAudio(preset.code);
-            updateURL(); // Update URL with new values
         });
         scrollingFrame.appendChild(button);
     }
