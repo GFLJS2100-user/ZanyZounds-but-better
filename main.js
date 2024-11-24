@@ -16,13 +16,19 @@ for (let name of Object.getOwnPropertyNames(Math)) {
     globalThis[name] = Math[name];
 }
 
+// New variables for visualization and debug mode
+let fftEnabled = false;
+let xyEnabled = false;
+let debugMode = false;
+let debugFrameCount = 0;
+
 function initAudio() {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    processor = audioCtx.createScriptProcessor(8192, 1, 1);
+    processor = audioCtx.createScriptProcessor(1024, 1, 1);
     analyser = audioCtx.createAnalyser();
     gainNode = audioCtx.createGain();
     gainNode.gain.value = currentVolume;
-    analyser.fftSize = 8192;
+    analyser.fftSize = 4096;
 }
 
 function resumeAudioContext() {
@@ -33,10 +39,10 @@ function resumeAudioContext() {
 
 function drawWaveform() {
     const canvas = document.getElementById('waveform');
-    const width = canvas.offsetWidth;
-    const height = canvas.offsetHeight;
+    let width = canvas.offsetWidth;
+    let height = canvas.offsetHeight;
     
-    // Only update canvas dimensions when needed
+    // Make canvas dimensions match the CSS dimensions
     if (canvas.width !== width || canvas.height !== height) {
         canvas.width = width;
         canvas.height = height;
@@ -46,40 +52,91 @@ function drawWaveform() {
     canvasCtx.imageSmoothingEnabled = false;
     
     const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-    const sliceWidth = width / bufferLength;
+    const timeData = new Uint8Array(bufferLength);
+    const freqData = new Uint8Array(bufferLength);
 
     function draw() {
         if (!isPlaying) return;
         
         requestAnimationFrame(draw);
-        analyser.getByteTimeDomainData(dataArray);
-
+        
+        // Clear canvas
         canvasCtx.fillStyle = 'rgb(20, 20, 20)';
         canvasCtx.fillRect(0, 0, width, height);
-        canvasCtx.lineWidth = 1;
-        canvasCtx.strokeStyle = 'rgb(0, 255, 0)';
-        canvasCtx.beginPath();
-
-        // Optimize drawing by sampling fewer points
-        const skip = Math.max(1, Math.floor(bufferLength / width));
-        let x = 0;
-
-        for (let i = 0; i < bufferLength; i += skip) {
-            const v = dataArray[i] / 128.0;
-            const y = height - (v * height / 2);
+        
+        if (fftEnabled) {
+            // Draw FFT
+            analyser.getByteFrequencyData(freqData);
+            canvasCtx.strokeStyle = 'rgb(0, 255, 0)';
+            canvasCtx.beginPath();
+            const barWidth = width / bufferLength;
             
-            if (i === 0) {
-                canvasCtx.moveTo(x, y);
-            } else {
-                canvasCtx.lineTo(x, y);
+            for (let i = 0; i < bufferLength; i++) {
+                const barHeight = (freqData[i] / 255.0) * height;
+                canvasCtx.fillStyle = `hsl(${(i/bufferLength) * 360}, 100%, 50%)`;
+                canvasCtx.fillRect(i * barWidth, height - barHeight, barWidth, barHeight);
             }
+        } else if (xyEnabled) {
+            // XY Mode (Lissajous)
+            analyser.getByteTimeDomainData(timeData);
+            canvasCtx.strokeStyle = 'rgb(0, 255, 0)';
+            canvasCtx.beginPath();
             
-            x += sliceWidth * skip;
+            for (let i = 0; i < bufferLength; i += 2) {
+                const x = (timeData[i] / 255.0) * width;
+                const y = (timeData[i + 1] / 255.0) * height;
+                
+                if (i === 0) {
+                    canvasCtx.moveTo(x, y);
+                } else {
+                    canvasCtx.lineTo(x, y);
+                }
+            }
+            canvasCtx.stroke();
+        } else {
+            // Normal waveform
+            analyser.getByteTimeDomainData(timeData);
+            canvasCtx.strokeStyle = 'rgb(0, 255, 0)';
+            canvasCtx.beginPath();
+            const sliceWidth = width / bufferLength;
+            let x = 0;
+
+            for (let i = 0; i < bufferLength; i++) {
+                const v = timeData[i] / 128.0;
+                // Inverted Y coordinate
+                const y = height - (v * height / 2); // Added height- to invert
+                
+                if (i === 0) {
+                    canvasCtx.moveTo(x, y);
+                } else {
+                    canvasCtx.lineTo(x, y);
+                }
+                x += sliceWidth;
+            }
+            canvasCtx.stroke();
         }
 
-        canvasCtx.lineTo(width, height / 2);
-        canvasCtx.stroke();
+        // Debug info
+        if (debugMode) {
+            debugFrameCount++;
+            if (debugFrameCount % 30 === 0) { // Update every 30 frames
+                const debugInfo = {
+                    'Frame Count': debugFrameCount,
+                    'Sample Time': sampleTime,
+                    'Sample Rate': currentSampleRate,
+                    'Buffer Size': bufferLength,
+                    'Mode': currentMode,
+                    'Audio Context State': audioCtx.state,
+                    'Current Volume': currentVolume,
+                    'FFT Enabled': fftEnabled,
+                    'XY Mode': xyEnabled,
+                    'Peak Level': Math.max(...timeData) / 255
+                };
+                
+                document.querySelector('#debug-display pre').textContent = 
+                    JSON.stringify(debugInfo, null, 2);
+            }
+        }
     }
 
     draw();
@@ -227,7 +284,7 @@ function startAudio(formula) {
         const t_start = Math.floor(sampleTime);
         
         // Process in chunks for better performance
-        const chunkSize = 2;
+        const chunkSize = 128;
         for (let i = 0; i < output.length; i += chunkSize) {
             const end = Math.min(i + chunkSize, output.length);
             
@@ -441,6 +498,36 @@ document.addEventListener('DOMContentLoaded', () => {
             gainNode.gain.value = currentVolume;
         }
     });
-    
+
+    // Add visualization and debug controls
+    const fftCheckbox = document.getElementById('fft-viz');
+    const xyCheckbox = document.getElementById('xy-viz');
+    const debugCheckbox = document.getElementById('debug-mode');
+    const debugDisplay = document.getElementById('debug-display');
+
+    fftCheckbox.addEventListener('change', (e) => {
+        fftEnabled = e.target.checked;
+        if (fftEnabled) xyCheckbox.checked = false;
+        xyEnabled = false;
+    });
+
+    xyCheckbox.addEventListener('change', (e) => {
+        xyEnabled = e.target.checked;
+        const canvas = document.getElementById('waveform');
+        
+        if (xyEnabled) {
+            fftCheckbox.checked = false;
+            fftEnabled = false;
+            canvas.classList.add('xy-mode');
+        } else {
+            canvas.classList.remove('xy-mode');
+        }
+    });
+
+    debugCheckbox.addEventListener('change', (e) => {
+        debugMode = e.target.checked;
+        debugDisplay.style.display = debugMode ? 'block' : 'none';
+    });
+
     loadPresets();
 });
