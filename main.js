@@ -24,7 +24,7 @@ let debugFrameCount = 0;
 
 function initAudio() {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    processor = audioCtx.createScriptProcessor(16384, 1, 1);
+    processor = audioCtx.createScriptProcessor(8192, 1, 1);
     analyser = audioCtx.createAnalyser();
     gainNode = audioCtx.createGain();
     gainNode.gain.value = currentVolume;
