@@ -235,7 +235,7 @@
 
   details summary::before {
     content: '▶';
-    display: inline;
+    display: inline-block;
     margin-right: 12px;
     transition: transform 0.3s ease;
     font-size: 18px;
