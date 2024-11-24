@@ -177,11 +177,8 @@ function updateURL() {
     
     try {
         const newUrl = new URL(window.location.origin + window.location.pathname);
-        // Convert string to hex
-        const hexCode = Array.from(code)
-            .map(c => c.charCodeAt(0).toString(16).padStart(2, '0'))
-            .join('');
-        newUrl.searchParams.set('code', hexCode);
+        // Use encodeURIComponent instead of hex encoding
+        newUrl.searchParams.set('code', encodeURIComponent(code));
         newUrl.searchParams.set('mode', mode);
         newUrl.searchParams.set('sampleRate', sampleRate);
 
@@ -196,11 +193,8 @@ function loadFromURL() {
     
     if (params.has('code')) {
         try {
-            const hexCode = params.get('code');
-            // Convert hex back to string
-            const code = hexCode.match(/.{1,2}/g)
-                ?.map(hex => String.fromCharCode(parseInt(hex, 16)))
-                .join('') || '';
+            // Use decodeURIComponent instead of hex decoding
+            const code = decodeURIComponent(params.get('code'));
             editor.setValue(code, -1);
             editor.clearSelection();
         } catch (e) {
@@ -336,7 +330,9 @@ function stopAudio() {
 }
 
 function loadPresets() {
-    fetch('zoundlibrary/library.json')
+    // Remove the first 8 characters from the URL for the fetch
+    const baseUrl = window.location.href.substring(8);
+    fetch(baseUrl + 'zoundlibrary/library.json')
         .then(response => response.json())
         .then(data => {
             presets = data.presets;
@@ -371,7 +367,9 @@ function updatePresetButtons() {
             // If there's a file reference, fetch it
             if (preset.file) {
                 try {
-                    const response = await fetch(`zoundlibrary/${preset.file}`);
+                    // Remove the first 8 characters from the URL for the fetch
+                    const baseUrl = window.location.href.substring(8);
+                    const response = await fetch(baseUrl + `zoundlibrary/${preset.file}`);
                     if (!response.ok) throw new Error('Failed to load file');
                     code = await response.text();
                 } catch (error) {
