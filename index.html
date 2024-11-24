@@ -25,6 +25,11 @@
         <option value="byte">Bytebeat</option>
         <option value="float">Floatbeat</option>
     </select>
+    <div class="viz-controls">
+        <label><input type="checkbox" id="fft-viz"> FFT</label>
+        <label><input type="checkbox" id="xy-viz"> XY Mode</label>
+        <label><input type="checkbox" id="debug-mode"> Debug</label>
+    </div>
     <button class="btn play-btn"><center>Listen to the code!</center></button>
     <button class="btn stop-btn"><center>Stop the code!</center></button>
 </div>
@@ -33,5 +38,9 @@
     <summary>Library</summary>
     <div id="scrolling-frame"></div>
 </details>
+
+<div id="debug-display" class="debug-display" style="display:none;">
+  <pre></pre>
+</div>
 </body>
 </html>
