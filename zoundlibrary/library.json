@@ -22,6 +22,14 @@
       "code": "(((((((t/(4E4>t?(2E4>t?t%(t>>9)*10|t/2&t:t*(t>>9)*10&t/2)|t%(t>>9)*3&t/16:t*(t>>9)^t))*(t>>4))-33)%256)+256)%256)+2)*8192",
       "mode": "byte",
       "sampleRate": 65536
+    }, 
+    {
+      "name": "1k dance",
+      "author": "raphaelgoulart",
+      "file": 1kdance.js,
+      "mode": "byte",
+      "sampleRate": 11025,
+      "date": "2019-03-10"
     }
   ]
 }
