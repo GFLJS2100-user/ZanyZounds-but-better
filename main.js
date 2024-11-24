@@ -345,7 +345,7 @@ function loadPresets() {
                     try {
                         // Check if it's a .js file
                         if (preset.file.endsWith('.js')) {
-                            const response = await fetch(`zoundlibrary/${preset.file}`);
+                            const response = await fetch(`zoundlibrary/js/${preset.file}`);
                             if (!response.ok) throw new Error('File not found');
                             const code = await response.text();
                             return {
