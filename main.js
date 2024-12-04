@@ -369,7 +369,7 @@ function updatePresetButtons() {
                 try {
                     // Remove the first 8 characters from the URL for the fetch
                     const baseUrl = window.location.href.substring(8);
-                    const response = await fetch(baseUrl + `zoundlibrary/${preset.file}`);
+                    const response = await fetch(baseUrl + `./zoundlibrary/${preset.file}`);
                     if (!response.ok) throw new Error('Failed to load file');
                     code = await response.text();
                 } catch (error) {
