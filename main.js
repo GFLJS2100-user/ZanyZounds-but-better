@@ -330,8 +330,6 @@ function stopAudio() {
 }
 
 function loadPresets() {
-    // Remove the first 8 characters from the URL for the fetch
-    const baseUrl = window.location.href.substring(8);
     fetch(baseUrl + './zoundlibrary/library.json')
         .then(response => response.json())
         .then(data => {
