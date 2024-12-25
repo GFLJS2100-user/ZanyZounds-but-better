@@ -330,7 +330,7 @@ function stopAudio() {
 }
 
 function loadPresets() {
-    fetch(baseUrl + './zoundlibrary/library.json')
+    fetch('zoundlibrary/library.json')
         .then(response => response.json())
         .then(data => {
             presets = data.presets;
